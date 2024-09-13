@@ -12,7 +12,7 @@ def load_prompt(filename):
         return file.read()
 
 def generate_job_description(job_title, additional_requirements):
-    main_prompt = load_prompt('main.txt')
+    main_prompt = load_prompt('job_description.txt')
     
     user_input = f"Job title: {job_title}. {additional_requirements}"
     

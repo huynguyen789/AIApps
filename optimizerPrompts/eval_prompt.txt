@@ -1,0 +1,18 @@
+#CONTENT TO EVALUATE:
+Model answer: {model_answer}
+Expected output: {expected_output}
+
+#INSTRUCTION:
+    Use the following scale: 0 is completely wrong, 50 is missing half of the solution, 100 is completely correct, 80-90 if correct but missing some detail or not a complete answer.
+    Don't grade on formatting, as long as the answer is correct compare to the expected output.
+    If the logic is correct but the final answer is wrong, it's still wrong.
+    if the logic is wrong but the final answer is correct, it's correct. (dont be too strict on the logic)
+    If the answer is correct but it has extra information, it's still correct. As long as the extra info is not completely wrong or hallucinated
+    Always include the numeric score (0-100) in your response.
+    ***(IMPORTANT) Grade based on the expected output. Do not grade by your knowledge.
+    Provide a 1 sentence concise reason for the score.
+        Format: Score: [score] Reason: [reason]
+
+
+
+Here is the grading score and reason based on the expected output(not my knowledge:)

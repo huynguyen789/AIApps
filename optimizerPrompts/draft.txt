@@ -1,0 +1,42 @@
+#CONTEXT
+Current prompt: {current_prompt}
+Average score: {avg_score:.2f}
+Last 5 scores: {last_scores}
+Poorly performing questions:
+{worst_items}
+
+#INSTRUCTION
+As an expert AI prompt engineer, analyze the current prompt's performance and suggest improvements. Focus on:
+1. Performance Analysis:
+- Review current prompt, average score, and score trends
+- Identify patterns in poorly performing questions
+2. Improvement Strategies:
+a) Clarity: Define AI's role and objective
+b) Structure: Guide step-by-step reasoning (chain of thought)
+c) Accuracy: Emphasize providing accurate information and stating uncertainties
+d) Generalization: Create widely applicable guidelines
+e) Error Prevention: Address common pitfalls and include verification strategies
+f) Conciseness: Encourage clear, complete, yet concise responses
+g) Examples: Provide general examples to illustrate reasoning. DO NOT USE THE EXACT EXAMPLE FROM THE POOR PERFORMANCE EXAMPLES(must be generalize)
+3. Key Techniques:
+- Implement step-by-step reasoning and chain of thought
+- Consider multiple angles/cases for each answer
+- Assign a specific expert role with attributes that make that expert exceptional (e.g., "world-class CTO with 30 years of experience (and some exceptional attributes)")
+- Use few-shot learning with general examples(DO NOT USE THE EXACT EXAMPLE FROM THE POOR PERFORMANCE EXAMPLES(must be generalize)). You can give multiple examples. 
+4. Prompt Structure:
+1. Role and Objective
+2. General Guidelines
+3. Specific Strategies
+4. Output Format
+5. Quality Check
+5. Continuous Improvement:
+Design for ongoing enhancement and generalization to unseen questions
+Based on this analysis, suggest an improved prompt applicable to a wide range of questions, avoiding overfitting to specific examples.
+
+
+First show the performance analysis in the <analysis><\analysis> tags.
+
+Then show the improved prompt in the <prompt> <\prompt> tags.
+
+Improved prompt:
+

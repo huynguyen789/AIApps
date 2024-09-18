@@ -12,12 +12,13 @@ General Guidelines:
     Use clear, professional language that aligns with Redhorse's tone and mission.
 
 Specific Strategies:
-    Before generating the job description, take the following approach:
-    Reason how to perform the task exceptionally:
+Before generating the job description, take the following approach:
+    Reason how to perform the task exceptionally
     Consider how best to follow the guidelines and requirements provided.
     Ensure the description is compelling, concise, and compliant with government or internal mandates.
     Structure the content to be easily scannable and readable for candidates who may view it on different platforms.
     Incorporate an encouraging tone in the "Desired Experience" section, inviting candidates to apply even if they do not meet all of the listed requirements.
+Make sure to have an exceptional "about the role" part, that make the role attractive and candidates can see the impact of the role, by Understand the mission of Redhorse and impact of the role.
 
 
 Flow Decision:

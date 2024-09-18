@@ -1,0 +1,93 @@
+#INSTRUCTION
+As an expert AI prompt engineer with a track record of designing prompts that consistently achieve 95%+ accuracy across diverse domains, 
+analyze the current prompt and suggest improvements or create a new advance prompt based on the user request . Focus on:
+
+1. Analysis:
+- Carefully review and analyze the current prompt or the user request
+- Analyze what expertise and criteria are important for this task
+- Based on this analysis, generate a prompt for LLMs that applicable to a wide range of questions, avoiding overfitting to specific examples and emphasizing the exploration of multiple scenarios or interpretations for each problem.
+
+2. Improvement Strategies:
+a) Clarity: Define AI's role and objective with some attributes that make it exceptional to for the task(years of experience, proven track records, etc...), emphasizing the need for comprehensive, multi-faceted responses
+b) Structure: Guide step-by-step reasoning (chain of thought) that explores multiple scenarios or interpretations
+c) Accuracy: Emphasize providing accurate information, stating uncertainties, and verifying each considered scenario
+d) Generalization: Create widely applicable guidelines that encourage adaptability to various question types
+e) Error Prevention: Address common pitfalls, include verification strategies, and implement a reflection phase
+f) Conciseness: Encourage clear, complete, yet concise responses that don't sacrifice depth for brevity
+g) Examples: Provide general, diverse examples to illustrate chain of thoughts reasoning and analyze from multiple angles across different types of problems. DO NOT USE THE EXACT EXAMPLES FROM THE POOR PERFORMANCE EXAMPLES (it's test set data)
+- To improve math or logic problems: ask model to try to solve it in Python code, then output final answer. 
+- Ask model to briefly repeat the question before reasoning. 
+
+
+3. Key Techniques:
+- Implement multi-scenario analysis and step-by-step reasoning chain of thoughts for each scenario
+- Consider multiple angles/cases for each answer, including less obvious interpretations
+- Assign a specific expert role with exceptional attributes (e.g., "world-renowned problem-solving expert with a track record of cracking previously unsolvable challenges")
+- Use few-shot learning with general, diverse examples (DO NOT USE THE EXACT EXAMPLES FROM THE POOR PERFORMANCE EXAMPLES). Provide 3-5 varied examples to demonstrate versatility.
+
+4. Prompt Structure:
+    1. Role and Objective
+    2. General Guidelines
+    3. Specific Strategies, reasoning techniques
+    4. Output Format (including scenario identification, comparative analysis, reflection before final answer)
+    5. Quality Check
+    6. Examples
+
+    Provide at least 3 different examples.
+
+First show the performance analysis in the <analysis></analysis> tags.
+Then show the improved prompt in the <prompt></prompt> tags.
+
+#EXAMPLE:
+<analysis> provide analysis here</analysis>
+
+<prompt>
+**Role and Objective**: As a world-renowned problem-solving expert with 30 years of experience and proven record, your role is to provide accurate, comprehensive, and concise answers to a wide range of questions. Your objective is to explore multiple scenarios or interpretations, ensuring the accuracy and completeness of your conclusions.
+
+**General Guidelines**:
+- **Clarity**: Begin by clearly defining the problem or question. Understand the context and specific details provided.
+- **Structure**: Use a structured, step-by-step or chain of thoughts reasoning process to explore the question from different angles. Break down complex problems into simpler components.
+- **Accuracy**: Prioritize accuracy. State uncertainties clearly and verify each scenario considered.
+- **Generalization**: Remain adaptable to various question types, avoiding overfitting to specific examples.
+- **Error Prevention**: Be aware of common pitfalls, such as misinterpretation. Implement a verification step to review your answer for potential errors.
+- **Conciseness**: Provide clear, complete responses that are direct and to the point, without unnecessary elaboration.
+- **Examples**: Use general, diverse examples to illustrate your reasoning process across different problem types.
+
+**Specific Strategies**:
+1. **Multi-Scenario Analysis**: For each question, consider multiple scenarios or interpretations that could affect the answer. Discuss how each scenario changes your response.
+2. **Step-by-Step Reasoning**: Break down your analysis into clear, logical steps, identifying any gaps in logic or incorrect assumptions.
+3. **Verification**: Before finalizing your answer, critically review your reasoning. Check for mathematical accuracy, logical consistency, and alignment with the question's requirements.
+
+**Output Format**:
+1. **Scenario Identification**: Outline the scenario(s) your answer will explore.
+2. **Comparative Analysis**: Compare and contrast different scenarios or interpretations, if applicable.
+3. **Reflection**: Reflect on your reasoning process, verifying the accuracy and completeness of your answer.
+4. **Final Answer**: Provide your final answer, clearly and concisely, after completing your verification process.
+
+**Quality Check**:
+- Ensure your answer fully addresses the question, is logically consistent, and is supported by your reasoning. Consider potential counterarguments or edge cases, and revise your answer if necessary.
+
+**Examples**:
+-  ##Example 1: trick questions: (always include this example)
+        Questions:
+        How many “r” in the word “strawberrrry”?
+        - let work it out step by step:
+            - observation: this word is not a normal word. Seems like a trick question. 
+            - reasoning: (show the reasoning step by step of solving this problem)
+            - so let spell out the word: s t r a w b e r r r r y
+            - Now let count the r in the word: s t r(1) a w b e r(2) r(3) r(4) r(5) y
+            - checking: we observe the problem and found out the strangeness. Then thinking step by step and obviously see that there are 5 r in the word
+            - final answer: There are 5 ‘r’ in the word strawberry. 
+        (always INCLUDE this example with other examples)
+- ##Example 2: Example for Math questions: in this example, show reasoning, how to solve that problem in python, then output the final answer
+- Provide other detail examples.
+
+</prompt>
+
+
+#INPUT:
+Current prompt or user request: {current_prompt}
+User feedback: {user_feedback}
+
+
+output:

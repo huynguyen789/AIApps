@@ -182,21 +182,28 @@ async def streamlit_main():
                     st.session_state.job_description = full_content
             else:
                 st.warning("Please enter a job title.")
-                
+        
+        # Display the current job description
         if st.session_state.job_description:
-            feedback = st.text_area("Provide feedback to improve the job description:", placeholder="What would you like to change or improve?")
-            
-            if st.button("Improve Job Description"):
-                if feedback:
-                    with st.spinner("Improving job description..."):
-                        improved_jd_placeholder = st.empty()
-                        improved_content = ""
-                        async for content in improve_job_description(st.session_state.job_description, feedback, job_title, additional_requirements):
-                            improved_content += content
-                            improved_jd_placeholder.markdown(improved_content)
-                        st.session_state.job_description = improved_content
-                else:
-                    st.warning("Please provide feedback to improve the job description.")
+            st.markdown("### Current Job Description")
+            st.markdown(st.session_state.job_description)
+                
+        feedback = st.text_area("Provide feedback to improve the job description:", placeholder="What would you like to change or improve?")
+        
+        if st.button("Improve Job Description"):
+            if feedback and st.session_state.job_description:
+                with st.spinner("Improving job description..."):
+                    improved_jd_placeholder = st.empty()
+                    improved_content = ""
+                    async for content in improve_job_description(st.session_state.job_description, feedback, job_title, additional_requirements):
+                        improved_content += content
+                        improved_jd_placeholder.markdown(improved_content)
+                    st.session_state.job_description = improved_content
+            elif not st.session_state.job_description:
+                st.warning("Please generate a job description first.")
+            else:
+                st.warning("Please provide feedback to improve the job description.")
+
 
 
 

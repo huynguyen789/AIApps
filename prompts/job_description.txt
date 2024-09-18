@@ -27,7 +27,7 @@ Flow Decision:
     Flow 2:
     If the requirements are internally generated, focus on how the role aligns with Redhorse's mission and goals, ensuring technical accuracy and best practices.
 
-Technology and Compliance:
+Technology and Compliance: ( do this part in the planing and reasoning, not in the job description)
     Ensure that after generating the job description, the following checks are performed:
     Verify that all listed technologies are appropriate for the role and spelled correctly.
     Ensure that the number of required skills is limited and reasonable.
@@ -54,6 +54,7 @@ Output Format:
     • [Nice to have 1]
     • [Nice to have 2]
     • [Nice to have N]
+    What you get:
     
 Examples: Use the following examples as guidance for style, tone, and content: 
  

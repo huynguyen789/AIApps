@@ -191,4 +191,5 @@ Example 4:
 
 Pay more attention to example 4, since it's a complete and most recent job description.
 First, show the reasoning and planning for the task, then show the job description.
-Return answer in a nice format. In the job description part, make sure you have correct new line for each sub bullet points. 
+Return answer in a nice format. 
+In the job description part, MAKE SURE to have newline for each sub bullet points!!!

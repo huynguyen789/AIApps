@@ -148,7 +148,7 @@ async def streamlit_main():
     Streamline your AI interactions with our advanced prompt engineering automation. Simply input your desired prompt type, and let our app craft highly effective prompts using sophisticated techniques. From job descriptions to custom AI instructions, we've got you covered.
     """)
     
-    tool_choice = st.sidebar.radio("Choose a tool:", ("Prompt Generator", "Job Description Generator" ))
+    tool_choice = st.sidebar.radio("Choose a tool:", ("Job Description Generator", "Prompt Generator"  ))
 
     if tool_choice == "Prompt Generator":
         st.header("Prompt Generator 🧠")

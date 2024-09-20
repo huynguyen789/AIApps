@@ -164,12 +164,22 @@ async def streamlit_main():
         st.header("Job Description Generator 📝")
         st.write("Enter the job title and any additional requirements to generate a high-quality job description.")
 
-        job_title = st.text_input("Enter the job title:", placeholder="e.g., Senior Software Engineer")
-        additional_requirements = st.text_area("Enter any additional requirements (optional):", 
-                                               placeholder="e.g., TS clearance, 5+ years of experience in Python, knowledge of machine learning",
-                                               key="job_description_requirements")
         if 'job_description' not in st.session_state:
             st.session_state.job_description = ""
+        if 'job_title' not in st.session_state:
+            st.session_state.job_title = ""
+        if 'additional_requirements' not in st.session_state:
+            st.session_state.additional_requirements = ""
+
+        job_title = st.text_input("Enter the job title:", 
+                                  value=st.session_state.job_title, 
+                                  placeholder="e.g., Senior Software Engineer",
+                                  key="job_title_input")  # Added unique key
+        additional_requirements = st.text_area("Enter any additional requirements (optional):", 
+                                               value=st.session_state.additional_requirements,
+                                               placeholder="e.g., TS clearance, 5+ years of experience in Python, knowledge of machine learning",
+                                               key="job_description_requirements")
+
 
         if st.button("Generate Job Description"):
             if job_title:
@@ -180,13 +190,15 @@ async def streamlit_main():
                         full_content += content
                         job_description_placeholder.markdown(full_content)
                     st.session_state.job_description = full_content
+                    st.session_state.job_title = job_title
+                    st.session_state.additional_requirements = additional_requirements
             else:
                 st.warning("Please enter a job title.")
         
         # Display the current job description
-        if st.session_state.job_description:
-            st.markdown("### Current Job Description")
-            st.markdown(st.session_state.job_description)
+        # if st.session_state.job_description:
+        #     st.markdown("### Current Job Description")
+        #     st.markdown(st.session_state.job_description)
                 
         feedback = st.text_area("Provide feedback to improve the job description:", placeholder="What would you like to change or improve?")
         
@@ -195,7 +207,7 @@ async def streamlit_main():
                 with st.spinner("Improving job description..."):
                     improved_jd_placeholder = st.empty()
                     improved_content = ""
-                    async for content in improve_job_description(st.session_state.job_description, feedback, job_title, additional_requirements):
+                    async for content in improve_job_description(st.session_state.job_description, feedback, st.session_state.job_title, st.session_state.additional_requirements):
                         improved_content += content
                         improved_jd_placeholder.markdown(improved_content)
                     st.session_state.job_description = improved_content

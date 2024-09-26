@@ -36,7 +36,7 @@ Technology and Compliance: ( do this part in the planing and reasoning, NOT in t
     Ensure compliance with legal requirements and Redhorse's specific needs.
     Verify that the content aligns with the appropriate workflow (government-provided or internal/custom requirements).
 
-    For cloud platforms, we mostly use DataBricks.
+    - Some of the tech we use: DataBricks(cloud provider), Gitlab, Jira, Spark, etc... This is just an info, select correct technologies based on the job. 
     
 
 Output Format:

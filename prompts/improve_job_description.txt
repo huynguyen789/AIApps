@@ -20,6 +20,8 @@ Please provide an improved version of the job description that incorporates the 
 Follow these guidelines when improving the job description:
 
 1. Ensure all technology terms are spelled correctly and used appropriately for the mentioned skills.
+    - Some of the tech we use: DataBricks(cloud provider), Gitlab, Jira, Spark, etc... This is just an info, select correct technologies based on the job. 
+    
 2. Limit the number of required skills, placing additional skills in the "Desired Experience" section.
 3. Keep the job description concise and easy to read, considering that applicants may view it on mobile devices.
 4. Only include specific education requirements if mandated by the government for the role.

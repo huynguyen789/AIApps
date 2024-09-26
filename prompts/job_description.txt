@@ -58,134 +58,102 @@ Output Format:
     
 Examples: Use the following examples as guidance: 
  
-Example 1: 
-    Senior Technical Advisor
-    About the Role
-    Redhorse transforms the way government uses data and technology. To support this mission, we are seeking a highly experienced Senior Technical Advisor (STA) to guide and implement advanced technology strategies across the Army Intelligence Enterprise. The STA plays a pivotal role in enhancing information and digital architecture services, leveraging emerging technologies, and ensuring alignment with mission objectives.
-    Key Responsibilities
-    Stakeholder Collaboration: Collaborate with diverse stakeholders across the Army Intelligence Enterprise to develop strategic technology goals.
-    Technology Advocacy: Champion the use of modern technology development approaches, including agile methodologies and open-source solutions.
-    Digital Architecture: Utilize expertise in digital architecture services, focusing on user-centered design and responsive, scalable information operations.
-    Emerging Technologies: Identify and evaluate emerging technologies for their potential impact on mission objectives, and advocate for enterprise-wide adoption.
-    Policy and Strategy: Assess current policies that impact technology adoption and lead efforts to facilitate change. Develop and refine program strategy iteratively based on stakeholder interaction and emerging needs.
-    Leadership Collaboration: Work with high-level officials across various departments to build support for unit strategies and goals.
-    Task Management: Handle a range of tasks, both classified and unclassified, as directed by government leadership.
-    Required Clearance and Certifications
-    Active TS security clearance
-    Eligible for SCI and NATO read-on prior to starting work
-    Meet the DoD requirements for a privileged user on a TS/SCI information system prior to starting work
-    DoD 8140 / 8570.01-m requirements – IAT II/III or IAM II/III
-    Required Education
-    MS / PhD in a discipline covered under Science, Technology, Engineering, or Mathematics (STEM) with 10 years' experience as a scientist/engineer and 5 years' experience as a technical lead on enterprise-scale IT systems
-    OR
-    BS in a STEM discipline with 15 years' experience as a scientist/engineer and 5 years' experience as a technical lead on enterprise-scale IT systems
-    Required Experience
-    Software Engineering: 10 years of experience, including leading software projects for Federal, DoD, or IC customers.
-    Data Integration: 10 years of experience with enterprise-scale data integration.
-    Advanced Analytics: 10 years of experience integrating advanced analytic capabilities into applications.
-    Risk Management: 10 years of experience with the Risk Management Framework (RMF) and third-party security assessment of enterprise TS/SCI systems.
-    Cloud Services: 5 years of experience with technical aspects of deploying IT systems through DoD or IC cloud service providers.
-    Program Management: 5 years of experience in project management, change management, financial analysis, contracting, and legal reviews.
-    Desired Experience
-    Enterprise Architecture: Experience with TS/SCI enterprise solution architecture, including on-premise and cloud solutions.
-    Accreditation: Experience with TS/SCI assessment and accreditation of enterprise IT systems.
-    Data Science and AI/ML: Operational experience taking data science or AI/ML projects from requirement to successful field deployment with ATO.
-    Certifications: Commercial cloud solutions architect certification is a plus.
-
-Example 2:
-    Solution Architect
-    About the Role
-    Redhorse transforms the way government uses data and technology. To support this mission, we are seeking an exceptional leader to serve as Solutions Architect for the Digital Solutions Center. The Solution Architect will be the lead for solutions architecture activities within the company, developing solutions for our customers' most-challenging missions. This position will be based in National Capital Region offices in the Rosslyn neighborhood of Arlington, VA.
-    Key Responsibilities
-    Provide technical expertise for strategy development in market engagement, solution creation, and proposal drafting with cross-functional teams.
-    Draft customer-focused proposals with clear narratives and full compliance with RFI/RFQ/RFP requirements.
-    Design architectural solutions and develop strategies for competitive proposals, incorporating team reviews and win themes.
-    Research and consolidate technical inputs from SMEs for responses to solicitations.
-    Lead and write proposal sections, coordinate multidisciplinary content, and ensure adherence to guidelines.
-    Manage proposal components, complete required documentation, and conduct final quality reviews for compliance and strategy alignment.
-    Required Experience
-    Minimum of 5 years of technical experience, with 3 years serving as an individual contributor or lead solutions architect for technical proposals in the federal contracting space.
-    Three years' experience architecting IT architecture (enterprise, data, etc.) and IT modernization initiatives.
-    Demonstrated ability to translate complex ideas into processes and tactical plans. Ability to present complex concepts simply and clearly.
-    Experience working with office productivity software, such as Microsoft Office Suite, including Word, Excel, PowerPoint, and file-sharing applications.
-    Ability to travel overnight to attend industry events and customer conferences.
-    Ability to obtain security clearance up to Top Secret (TS).
-    Desired Experience
-    Familiarity and experience with Architecture Frameworks such as DoDAF.
-    Experience developing solutions hosted in one of the major cloud service providers.
-    Experience with cybersecurity terms and processes.
-    Familiarity with concepts, practices, and procedures in working with FFP, BPA, T&M, and IDIQ contracts.
-
-Example 3:
-    Machine Learning Engineer
-    About the Role
-    Redhorse transforms the way government uses data and technology. To support this mission, we are seeking a Machine Learning Engineer to support the Office of the CTO. In this role, you will help develop cutting-edge capabilities that can be utilized across our diverse customer set, enhancing our ability to leverage generative AI technologies for mission-focused government applications.
-    Key Responsibilities
-    Design, develop, and maintain machine learning models with a focus on generative AI, including but not limited to natural language processing and computer vision.
-    Engage in prompt engineering, exploring innovative ways to interact with large language models (LLMs) to achieve desired outputs.
-    Integrate open-source machine learning projects and the latest advancements into our solutions.
-    Develop and implement strategies for fine-tuning large language models for specific tasks or datasets, enhancing model performance and accuracy.
-    Work closely with the product and engineering teams to deploy scalable models.
-    Lead cross-functional initiatives to pilot and scale AI technologies across the organization, aligning with Redhorse's mission and strategic objectives.
-    Develop prototypes to demonstrate to clients the value and impact of Generative AI capabilities.
-    Basic Requirements
-    3 years of experience in machine learning, data science, or a related role, with a focus on generative AI and natural language processing.
-    Proficiency in Python, and familiarity with machine learning frameworks like PyTorch and LangChain.
-    Experience with prompt engineering, model fine-tuning, and deploying machine learning models.
-    Demonstrated ability to work on complex problems and translate requirements into robust AI solutions.
-    Desired Experience
-    Degree in Computer Science, Engineering, Mathematics, or a related field.
-    Contributions to open-source machine learning projects or active participation in the AI research community.
-    Experience with cloud computing platforms (AWS, Google Cloud, Azure) and containerization technologies (Docker, Kubernetes).
-    Familiarity with the latest trends in AI ethics and responsible AI practices.
-    Demonstrating prototypes to clients.
-    Technology and Compliance Checklist:
-    All listed technologies are appropriate and spelled correctly.
-    Required skills are limited and reasonable.
-    Job description length is concise and easy to read.
-    Certifications and clearances are relevant and necessary for the roles.
-    Content aligns with legal requirements and Redhorse's specific needs.
-    Workflow is appropriate for both government and internal requirements.
-
-Example 4:
-    Machine Learning Intern
-    Arlington, VACorporate Functions – Corporate /Intern /Hybrid
-    About the Organization
-    Now is a great time to join Redhorse Corporation. Redhorse specializes in developing and implementing creative strategies and solutions with private, state, and federal customers in the areas of cultural and environmental resources services, climate and energy change, information technology, and intelligence services. We are hiring creative, motivated, and talented people with a passion for doing what's right, what's smart, and what works.
-
-    About the Role 
-    Join Redhorse in revolutionizing how government leverages data and technology! We're seeking innovative minds for our Summer 2025 AI Internship program, where you'll tackle real-world challenges at the intersection of artificial intelligence and public sector transformation. As part of our dynamic intern team, you'll work on cutting-edge projects under the guidance of experienced mentors, gaining hands-on experience with state-of-the-art technologies and their practical applications to government missions. If that is your idea of a great summer, we encourage you to apply! 
-    Required Experience
-
-    Python: You don’t need to be an expert, but to be successful you should be comfortable scripting in Python. 
-    Data science and machine learning: Familiarity with basic ML algorithms and data analysis techniques. Formal (e.g. classroom, prior internship) or informal (e.g. open source participation, Kaggle, personal projects) experience developing an analytical solution to a problem involving data. 
-    Data Manipulation: Experience in data cleaning, preprocessing, and feature engineering. 
-    Teamwork: Demonstrated ability to work in a collaborative environment, including good communication skills. 
-    Problem-Solving: Strong critical thinking skills and a willingness to tackle complex problems. 
-    Desired Experience
-
-    Applied Research: Ability to read and implement ideas from AI/ML research papers and open source repositories. 
-    Generative AI: Experience working with Generative AI tools and open source libraries. 
-    Software development: Experience with version control systems like Git and familiarity other programming languages (e.g. C, Java). 
-    Cloud Computing: Exposure to cloud platforms like AWS, Azure, or Google Cloud. 
-    Natural Language Processing (NLP): Experience or coursework related to text analytics or NLP. 
-    You don’t need to have any of the experience above, but if you do, it may help you stand out from the crowd. We encourage you to apply even if you don’t have any of the following experience. 
-    What you'll get
-
-    Gain valuable experience working on high-impact projects targeted towards government client use cases
-    Build a strong foundation for a career in AI, with exposure to both research and practical applications
-    Mentorship from industry experts
-    Exposure to working with the federal government
-    Networking Opportunities
-    Competitive hourly salary ($30-$35/hr)
-    Equal Opportunity Employer/Veterans/Disabled 
-    
-    Accommodations:
-    If you are a qualified individual with a disability or a disabled veteran, you may request a reasonable accommodation if you are unable or limited in your ability to access job openings or apply for a job on this site as a result of your disability. You can request reasonable accommodations by contacting Talent Acquisition at Talent_Acquisition@redhorsecorp.com
-    
-    Redhorse Corporation shall, in its discretion, modify or adjust the position to meet Redhorse’s changing needs.
-    This job description is not a contract and may be adjusted as deemed appropriate in Redhorse’s sole discretion.
-
+Example 1: Senior Technical Advisor
+About the Role: Redhorse transforms the way government uses data and technology. To support this mission, we are seeking a highly experienced Senior Technical Advisor (STA) to guide and implement advanced technology strategies across the Army Intelligence Enterprise. The STA plays a pivotal role in enhancing information and digital architecture services, leveraging emerging technologies, and ensuring alignment with mission objectives.
+Key Responsibilities:
+•	Stakeholder Collaboration: Collaborate with diverse stakeholders across the Army Intelligence Enterprise to develop strategic technology goals.
+•	Technology Advocacy: Champion the use of modern technology development approaches, including agile methodologies and open-source solutions.
+•	Digital Architecture: Utilize expertise in digital architecture services, focusing on user-centered design and responsive, scalable information operations.
+•	Emerging Technologies: Identify and evaluate emerging technologies for their potential impact on mission objectives, and advocate for enterprise-wide adoption.
+•	Policy and Strategy: Assess current policies that impact technology adoption and lead efforts to facilitate change. Develop and refine program strategy iteratively based on stakeholder interaction and emerging needs.
+•	Leadership Collaboration: Work with high-level officials across various departments to build support for unit strategies and goals.
+•	Task Management: Handle a range of tasks, both classified and unclassified, as directed by government leadership.
+Required Clearance and Certifications:
+•	Active TS security clearance
+•	Eligible for SCI and NATO read-on prior to starting work
+•	Meet the DoD requirements for a privileged user on a TS/SCI information system prior to starting work
+•	DoD 8140 / 8570.01-m requirements – IAT II/III or IAM II/III
+Required Education: MS / PhD in a discipline covered under Science, Technology, Engineering, or Mathematics (STEM) with 10 years' experience as a scientist/engineer and 5 years' experience as a technical lead on enterprise-scale IT systems OR BS in a STEM discipline with 15 years' experience as a scientist/engineer and 5 years' experience as a technical lead on enterprise-scale IT systems
+Required Experience:
+•	Software Engineering: 10 years of experience, including leading software projects for Federal, DoD, or IC customers.
+•	Data Integration: 10 years of experience with enterprise-scale data integration.
+•	Advanced Analytics: 10 years of experience integrating advanced analytic capabilities into applications.
+•	Risk Management: 10 years of experience with the Risk Management Framework (RMF) and third-party security assessment of enterprise TS/SCI systems.
+•	Cloud Services: 5 years of experience with technical aspects of deploying IT systems through DoD or IC cloud service providers.
+•	Program Management: 5 years of experience in project management, change management, financial analysis, contracting, and legal reviews.
+Desired Experience:
+•	Enterprise Architecture: Experience with TS/SCI enterprise solution architecture, including on-premise and cloud solutions.
+•	Accreditation: Experience with TS/SCI assessment and accreditation of enterprise IT systems.
+•	Data Science and AI/ML: Operational experience taking data science or AI/ML projects from requirement to successful field deployment with ATO.
+•	Certifications: Commercial cloud solutions architect certification is a plus.
+Example 2: Solution Architect
+About the Role: Redhorse transforms the way government uses data and technology. To support this mission, we are seeking an exceptional leader to serve as Solutions Architect for the Digital Solutions Center. The Solution Architect will be the lead for solutions architecture activities within the company, developing solutions for our customers' most-challenging missions. This position will be based in National Capital Region offices in the Rosslyn neighborhood of Arlington, VA.
+Key Responsibilities:
+•	Provide technical expertise for strategy development in market engagement, solution creation, and proposal drafting with cross-functional teams.
+•	Draft customer-focused proposals with clear narratives and full compliance with RFI/RFQ/RFP requirements.
+•	Design architectural solutions and develop strategies for competitive proposals, incorporating team reviews and win themes.
+•	Research and consolidate technical inputs from SMEs for responses to solicitations.
+•	Lead and write proposal sections, coordinate multidisciplinary content, and ensure adherence to guidelines.
+•	Manage proposal components, complete required documentation, and conduct final quality reviews for compliance and strategy alignment.
+Required Experience:
+•	Minimum of 5 years of technical experience, with 3 years serving as an individual contributor or lead solutions architect for technical proposals in the federal contracting space.
+•	Three years' experience architecting IT architecture (enterprise, data, etc.) and IT modernization initiatives.
+•	Demonstrated ability to translate complex ideas into processes and tactical plans. Ability to present complex concepts simply and clearly.
+•	Experience working with office productivity software, such as Microsoft Office Suite, including Word, Excel, PowerPoint, and file-sharing applications.
+•	Ability to travel overnight to attend industry events and customer conferences.
+•	Ability to obtain security clearance up to Top Secret (TS).
+Desired Experience:
+•	Familiarity and experience with Architecture Frameworks such as DoDAF.
+•	Experience developing solutions hosted in one of the major cloud service providers.
+•	Experience with cybersecurity terms and processes.
+•	Familiarity with concepts, practices, and procedures in working with FFP, BPA, T&M, and IDIQ contracts.
+Example 3: Machine Learning Engineer
+About the Role: Redhorse transforms the way government uses data and technology. To support this mission, we are seeking a Machine Learning Engineer to support the Office of the CTO. In this role, you will help develop cutting-edge capabilities that can be utilized across our diverse customer set, enhancing our ability to leverage generative AI technologies for mission-focused government applications.
+Key Responsibilities:
+•	Design, develop, and maintain machine learning models with a focus on generative AI, including but not limited to natural language processing and computer vision.
+•	Engage in prompt engineering, exploring innovative ways to interact with large language models (LLMs) to achieve desired outputs.
+•	Integrate open-source machine learning projects and the latest advancements into our solutions.
+•	Develop and implement strategies for fine-tuning large language models for specific tasks or datasets, enhancing model performance and accuracy.
+•	Work closely with the product and engineering teams to deploy scalable models.
+•	Lead cross-functional initiatives to pilot and scale AI technologies across the organization, aligning with Redhorse's mission and strategic objectives.
+•	Develop prototypes to demonstrate to clients the value and impact of Generative AI capabilities.
+Basic Requirements:
+•	3 years of experience in machine learning, data science, or a related role, with a focus on generative AI and natural language processing.
+•	Proficiency in Python, and familiarity with machine learning frameworks like PyTorch and LangChain.
+•	Experience with prompt engineering, model fine-tuning, and deploying machine learning models.
+•	Demonstrated ability to work on complex problems and translate requirements into robust AI solutions.
+Desired Experience:
+•	Degree in Computer Science, Engineering, Mathematics, or a related field.
+•	Contributions to open-source machine learning projects or active participation in the AI research community.
+•	Experience with cloud computing platforms (AWS, Google Cloud, Azure) and containerization technologies (Docker, Kubernetes).
+•	Familiarity with the latest trends in AI ethics and responsible AI practices.
+•	Demonstrating prototypes to clients.
+Example 4: Machine Learning Intern
+About the Organization: Now is a great time to join Redhorse Corporation. Redhorse specializes in developing and implementing creative strategies and solutions with private, state, and federal customers in the areas of cultural and environmental resources services, climate and energy change, information technology, and intelligence services. We are hiring creative, motivated, and talented people with a passion for doing what's right, what's smart, and what works.
+About the Role: Join Redhorse in revolutionizing how government leverages data and technology! We're seeking innovative minds for our Summer 2025 AI Internship program, where you'll tackle real-world challenges at the intersection of artificial intelligence and public sector transformation. As part of our dynamic intern team, you'll work on cutting-edge projects under the guidance of experienced mentors, gaining hands-on experience with state-of-the-art technologies and their practical applications to government missions. If that is your idea of a great summer, we encourage you to apply!
+Required Experience:
+•	Python: You don't need to be an expert, but to be successful you should be comfortable scripting in Python.
+•	Data science and machine learning: Familiarity with basic ML algorithms and data analysis techniques. Formal (e.g. classroom, prior internship) or informal (e.g. open source participation, Kaggle, personal projects) experience developing an analytical solution to a problem involving data.
+•	Data Manipulation: Experience in data cleaning, preprocessing, and feature engineering.
+•	Teamwork: Demonstrated ability to work in a collaborative environment, including good communication skills.
+•	Problem-Solving: Strong critical thinking skills and a willingness to tackle complex problems.
+Desired Experience:
+•	Applied Research: Ability to read and implement ideas from AI/ML research papers and open source repositories.
+•	Generative AI: Experience working with Generative AI tools and open source libraries.
+•	Software development: Experience with version control systems like Git and familiarity other programming languages (e.g. C, Java).
+•	Cloud Computing: Exposure to cloud platforms like AWS, Azure, or Google Cloud.
+•	Natural Language Processing (NLP): Experience or coursework related to text analytics or NLP.
+You don't need to have any of the experience above, but if you do, it may help you stand out from the crowd. We encourage you to apply even if you don't have any of the following experience.
+What you'll get:
+•	Gain valuable experience working on high-impact projects targeted towards government client use cases
+•	Build a strong foundation for a career in AI, with exposure to both research and practical applications
+•	Mentorship from industry experts
+•	Exposure to working with the federal government
+•	Networking Opportunities
+•	Competitive hourly salary ($30-$35/hr)
+Equal Opportunity Employer/Veterans/Disabled
+Accommodations: If you are a qualified individual with a disability or a disabled veteran, you may request a reasonable accommodation if you are unable or limited in your ability to access job openings or apply for a job on this site as a result of your disability. You can request reasonable accommodations by contacting Talent Acquisition at Talent_Acquisition@redhorsecorp.com
+Redhorse Corporation shall, in its discretion, modify or adjust the position to meet Redhorse's changing needs. This job description is not a contract and may be adjusted as deemed appropriate in Redhorse's sole discretion.
 
 
 

@@ -27,7 +27,7 @@ Flow Decision:
     Flow 2:
     If the requirements are internally generated, focus on how the role aligns with Redhorse's mission and goals, ensuring technical accuracy and best practices.
 
-Technology and Compliance: ( do this part in the planing and reasoning, not in the job description)
+Technology and Compliance: ( do this part in the planing and reasoning, NOT in the job description)
     Ensure that after generating the job description, the following checks are performed:
     Verify that all listed technologies are appropriate for the role and spelled correctly.
     Ensure that the number of required skills is limited and reasonable.
@@ -37,26 +37,26 @@ Technology and Compliance: ( do this part in the planing and reasoning, not in t
     Verify that the content aligns with the appropriate workflow (government-provided or internal/custom requirements).
 
 Output Format:
-    Use the following structure for your job description:
+    Use the following structure for your job description, make sure to get correct new line for each part:
     About the Role
     [Brief overview of the role and its importance to Redhorse's mission]
     Key Responsibilities
-    • [Responsibility 1]
-    • [Responsibility 2]
-    • [Responsibility 3]
-    • [Responsibility N]
+        • [Responsibility 1]
+        • [Responsibility 2]
+        • [Responsibility 3]
+        • [Responsibility N]
     Required Experience/Clearance
-    • [Requirement 1]
-    • [Requirement 2]
-    • [Requirement N]
+        • [Requirement 1]
+        • [Requirement 2]
+        • [Requirement N]
     Desired Experience
     We encourage all candidates who meet the basic requirements to apply, even if you do not have any of the following experience:
-    • [Nice to have 1]
-    • [Nice to have 2]
-    • [Nice to have N]
+        • [Nice to have 1]
+        • [Nice to have 2]
+        • [Nice to have N]
     What you get:
     
-Examples: Use the following examples as guidance for style, tone, and content: 
+Examples: Use the following examples as guidance: 
  
 Example 1: 
     Senior Technical Advisor
@@ -192,4 +192,5 @@ Example 4:
 Pay more attention to example 4, since it's a complete and most recent job description.
 First, show the reasoning and planning for the task, then show the job description.
 Return answer in a nice format. 
+
 In the job description part, MAKE SURE to have newline for each sub bullet points!!!

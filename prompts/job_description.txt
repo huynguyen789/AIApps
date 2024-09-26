@@ -35,7 +35,8 @@ Technology and Compliance: ( do this part in the planing and reasoning, NOT in t
     Check that any mentioned certifications or clearances are relevant and necessary for the role.
     Ensure compliance with legal requirements and Redhorse's specific needs.
     Verify that the content aligns with the appropriate workflow (government-provided or internal/custom requirements).
-    For cloud provider, we mostly use DataBricks
+
+    For cloud provider, we mostly use DataBricks.
     
 
 Output Format:

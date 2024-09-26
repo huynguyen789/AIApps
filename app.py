@@ -50,7 +50,7 @@ async def generate_job_description(job_title, additional_requirements):
     user_input = f"Job title: {job_title}. {additional_requirements}"
     
     response = await openai_client.chat.completions.create(
-        model="gpt-4o",  # Changed from "gpt-4o" to "gpt-4"
+        model="gpt-4o-2024-08-06",  # Changed from "gpt-4o" to "gpt-4"
         messages=[
             {"role": "system", "content": main_prompt},
             {"role": "user", "content": user_input}

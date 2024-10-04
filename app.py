@@ -390,9 +390,15 @@ async def streamlit_main():
     elif tool_choice == "Text to Diagram Converter":
         st.header("Text to Diagram Converter 🎨")
         st.write("Transform your ideas into visual diagrams with ease!")
+        st.write("Here are some example descriptions you can use:")
+        st.code("""
+        1. A flowchart of making coffee
+        2. A flowchart of an MLOps pipeline
+        3. A flowchart of a user registration process
+        """, language="markdown")
 
         description = st.text_area("Describe the diagram you want to create:", 
-                                placeholder="e.g., A flowchart showing the steps to plan a vacation")
+                                placeholder="e.g., A flowchart showing the steps to plan a vacation, a flowchart of a MLOps system")
 
         if st.button("Create Diagram"):
             if description:
@@ -408,6 +414,7 @@ async def streamlit_main():
                     else:
                         st.subheader("Diagram Code (for advanced users):")
                         st.code(mermaid_code, language="mermaid")
+                        st.info("You can copy the code and edit the diagram in [Mermaid Live](https://mermaid.live/).")
             else:
                 st.warning("Please enter a description for your diagram.")
 

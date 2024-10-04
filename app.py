@@ -434,11 +434,13 @@ async def streamlit_main():
         3. A flowchart of a user registration process
         """, language="markdown")
 
-        # Initialize session state for diagram description and Mermaid code
+        # Initialize session state variables
         if "diagram_description" not in st.session_state:
             st.session_state.diagram_description = ""
         if "mermaid_code" not in st.session_state:
             st.session_state.mermaid_code = ""
+        if "diagram_created" not in st.session_state:
+            st.session_state.diagram_created = False
 
         # Use session state for the text area
         st.session_state.diagram_description = st.text_area(
@@ -447,49 +449,48 @@ async def streamlit_main():
             placeholder="e.g., A flowchart showing the steps to plan a vacation, a flowchart of a MLOps system"
         )
 
-        if st.button("Create Diagram"):
+        if st.button("Create Diagram") or st.session_state.diagram_created:
             if st.session_state.diagram_description:
-                with st.spinner("Creating your diagram..."):
-                    st.session_state.mermaid_code = await generate_mermaid_diagram(st.session_state.diagram_description)
-                    st.subheader("Your Generated Diagram:")
-                    try:
-                        mermaid = stmd.st_mermaid(st.session_state.mermaid_code, height=800)
-                    except Exception as e:
-                        st.error(f"Oops! There was an error creating your diagram: {str(e)}")
-                        st.text("Technical details (for troubleshooting):")
-                        st.code(st.session_state.mermaid_code, language="mermaid")
-                    else:
-                        st.subheader("Diagram Code:")
-                        st.code(st.session_state.mermaid_code, language="mermaid")
-                        st.info("You can copy this code and edit the diagram in [Mermaid Live](https://mermaid.live/).")
-                        
-                        # Generate PNG image
-                        png_image = generate_mermaid_chart(st.session_state.mermaid_code, format='png')
-                        if png_image:
-                            st.download_button(
-                                label="Download Diagram as PNG",
-                                data=png_image,
-                                file_name="mermaid_diagram.png",
-                                mime="image/png"
-                            )
-                        else:
-                            st.warning("Unable to generate a downloadable PNG. You can still use the Mermaid code above.")
+                if not st.session_state.diagram_created:
+                    with st.spinner("Creating your diagram..."):
+                        st.session_state.mermaid_code = await generate_mermaid_diagram(st.session_state.diagram_description)
+                        st.session_state.diagram_created = True
 
-                        # Generate SVG image
-                        svg_image = generate_mermaid_chart(st.session_state.mermaid_code, format='svg')
-                        if svg_image:
-                            st.download_button(
-                                label="Download Diagram as SVG",
-                                data=svg_image,
-                                file_name="mermaid_diagram.svg",
-                                mime="image/svg+xml"
-                            )
-                        else:
-                            st.warning("Unable to generate a downloadable SVG. You can still use the Mermaid code above.")
+                st.subheader("Your Generated Diagram:")
+                try:
+                    mermaid = stmd.st_mermaid(st.session_state.mermaid_code, height=800)
+                except Exception as e:
+                    st.error(f"Oops! There was an error creating your diagram: {str(e)}")
+                    st.text("Technical details (for troubleshooting):")
+                    st.code(st.session_state.mermaid_code, language="mermaid")
+                else:
+                    st.subheader("Diagram Code:")
+                    st.code(st.session_state.mermaid_code, language="mermaid")
+                    st.info("You can copy this code and edit the diagram in [Mermaid Live](https://mermaid.live/).")
+                    
+                    # Generate PNG image
+                    png_image = generate_mermaid_chart(st.session_state.mermaid_code, format='png')
+                    if png_image:
+                        st.download_button(
+                            label="Download Diagram as PNG",
+                            data=png_image,
+                            file_name="mermaid_diagram.png",
+                            mime="image/png",
+                            key="png_download"
+                        )
+                    else:
+                        st.warning("Unable to generate a downloadable PNG. You can still use the Mermaid code above.")
+
+
 
             else:
                 st.warning("Please enter a description for your diagram.")
 
+        if st.button("Reset"):
+            st.session_state.diagram_description = ""
+            st.session_state.mermaid_code = ""
+            st.session_state.diagram_created = False
+            st.rerun()
 
 if __name__ == "__main__":
     asyncio.run(streamlit_main())

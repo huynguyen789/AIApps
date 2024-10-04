@@ -210,19 +210,9 @@ async def generate_mermaid_diagram(description):
     prompt = """
     You are an expert in creating Mermaid diagrams. Based on the user's description, generate a Mermaid diagram code.
     Make sure the code is valid and follows Mermaid syntax. Return only the Mermaid code, without any additional text or explanations, tags, or code block markers.
+    Try to design the code to fit nicely in horizontal monitor for user.
     
-    
-    Example:
-    Bad output :```mermaid
-    graph TD
-        Start --> Water
-        Water --> HeatWater
-        HeatWater --> BoilingWater
-        BoilingWater --> AddGroundCoffee
-        AddGroundCoffee --> Brew
-        Brew --> Coffee
-        Coffee --> Enjoy
-    ```
+
     
     Good output:
         graph TD
@@ -262,7 +252,7 @@ async def streamlit_main():
         """
     )
     
-    tool_choice = st.sidebar.radio("Choose a tool:", ("Job Description Generator", "Prompt Generator", "Writing Assistant", "BD Response Assistant", "Mermaid Diagram Generator"))
+    tool_choice = st.sidebar.radio("Choose a tool:", ("Job Description Generator", "Prompt Generator", "Writing Assistant", "BD Response Assistant", "Text to Diagram Converter"))
 
     if tool_choice == "Prompt Generator":
         st.header("Prompt Generator 🧠")
@@ -397,29 +387,29 @@ async def streamlit_main():
                     feedback = await get_feedback(st.session_state.bd_document, st.session_state.bd_requirements)
                     st.markdown(feedback)
 
-    elif tool_choice == "Mermaid Diagram Generator":
-        st.header("Mermaid Diagram Generator 📊")
-        st.write("Generate Mermaid diagrams from text descriptions.")
+    elif tool_choice == "Text to Diagram Converter":
+        st.header("Text to Diagram Converter 🎨")
+        st.write("Transform your ideas into visual diagrams with ease!")
 
         description = st.text_area("Describe the diagram you want to create:", 
-                                placeholder="e.g., A flowchart showing the process of making coffee")
+                                placeholder="e.g., A flowchart showing the steps to plan a vacation")
 
-        if st.button("Generate Diagram"):
+        if st.button("Create Diagram"):
             if description:
-                with st.spinner("Generating Mermaid diagram..."):
+                with st.spinner("Creating your diagram..."):
                     mermaid_code = await generate_mermaid_diagram(description)
-                    st.subheader("Generated Mermaid Diagram:")
+                    st.subheader("Your Generated Diagram:")
                     try:
-                        mermaid = stmd.st_mermaid(mermaid_code, height=None)
+                        mermaid = stmd.st_mermaid(mermaid_code, height=800)
                     except Exception as e:
-                        st.error(f"Error rendering Mermaid diagram: {str(e)}")
-                        st.text("Generated Mermaid code (for debugging):")
+                        st.error(f"Oops! There was an error creating your diagram: {str(e)}")
+                        st.text("Technical details (for troubleshooting):")
                         st.code(mermaid_code, language="mermaid")
                     else:
-                        st.subheader("Mermaid Code:")
+                        st.subheader("Diagram Code (for advanced users):")
                         st.code(mermaid_code, language="mermaid")
             else:
-                st.warning("Please enter a description for the diagram.")
+                st.warning("Please enter a description for your diagram.")
 
 if __name__ == "__main__":
     asyncio.run(streamlit_main())

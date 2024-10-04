@@ -44,47 +44,7 @@ async def get_model_answer(instruction, prompt, model_name):
 def remove_analysis(prompt):
     return re.sub(r'<analysis>.*?</analysis>', '', prompt, flags=re.DOTALL)
 
-async def generate_job_description(job_title, additional_requirements):
-    main_prompt = load_prompt('job_description.txt')
-    
-    user_input = f"Job title: {job_title}. {additional_requirements}"
-    
-    response = await openai_client.chat.completions.create(
-        model="gpt-4o",  # Changed from "gpt-4o" to "gpt-4"
-        messages=[
-            {"role": "system", "content": main_prompt},
-            {"role": "user", "content": user_input}
-        ],
-        stream=True,
-    )
 
-    async for chunk in response:
-        if chunk.choices[0].delta.content is not None:
-            yield chunk.choices[0].delta.content
-    
-async def improve_job_description(original_jd, feedback, job_title, additional_requirements):
-    improve_prompt = load_prompt('improve_job_description.txt')
-    improve_input = f"""
-Original Job Title: {job_title}
-Additional Requirements: {additional_requirements}
-
-Original Job Description:
-{original_jd}
-
-User Feedback:
-{feedback}
-"""
-    response = await openai_client.chat.completions.create(
-        model="gpt-4o",  # Changed from "gpt-4o" to "gpt-4"
-        messages=[
-            {"role": "system", "content": improve_prompt},
-            {"role": "user", "content": improve_input}
-        ],
-        stream=True,
-    )
-    async for chunk in response:
-        if chunk.choices[0].delta.content is not None:
-            yield chunk.choices[0].delta.content
 async def prompt_generator(user_request):
     optimizer_model = "claude-3-sonnet-20240229"  # or "gpt-4-0125-preview"
     
@@ -141,6 +101,52 @@ async def prompt_generator(user_request):
     return st.session_state.current_prompt
 
 
+
+#Job description generator:
+async def generate_job_description(job_title, additional_requirements):
+    main_prompt = load_prompt('job_description.txt')
+    
+    user_input = f"Job title: {job_title}. {additional_requirements}"
+    
+    response = await openai_client.chat.completions.create(
+        model="gpt-4o",  # Changed from "gpt-4o" to "gpt-4"
+        messages=[
+            {"role": "system", "content": main_prompt},
+            {"role": "user", "content": user_input}
+        ],
+        stream=True,
+    )
+
+    async for chunk in response:
+        if chunk.choices[0].delta.content is not None:
+            yield chunk.choices[0].delta.content
+    
+async def improve_job_description(original_jd, feedback, job_title, additional_requirements):
+    improve_prompt = load_prompt('improve_job_description.txt')
+    improve_input = f"""
+Original Job Title: {job_title}
+Additional Requirements: {additional_requirements}
+
+Original Job Description:
+{original_jd}
+
+User Feedback:
+{feedback}
+"""
+    response = await openai_client.chat.completions.create(
+        model="gpt-4o",  # Changed from "gpt-4o" to "gpt-4"
+        messages=[
+            {"role": "system", "content": improve_prompt},
+            {"role": "user", "content": improve_input}
+        ],
+        stream=True,
+    )
+    async for chunk in response:
+        if chunk.choices[0].delta.content is not None:
+            yield chunk.choices[0].delta.content
+#End Job description generator:
+
+
 #Writing tools
 async def process_text(user_input, task):
    
@@ -158,7 +164,7 @@ async def process_text(user_input, task):
     user_input = f'"{user_input}"'
     
     response = await openai_client.chat.completions.create(
-        model="gpt-4o",
+        model="gpt-4o-mini",
         messages=[
             {"role": "system", "content": prompts[task]},
             {"role": "user", "content": user_input}
@@ -175,24 +181,42 @@ async def process_text(user_input, task):
     # return processed_content
 #End Writing tools
 
+#BD Response Assistant
+async def get_feedback(document, requirements):
+    user_content = f"""
+    <system_prompt>
+    You are an expert in business development proposals for government with 30 years track record exceptional experience and of 95% winning rate proposal."
+    </system_prompt>
+    
+    Requirements Document:\n{requirements}\n\nUser's Draft:\n{document}\n\n
+    
+    Provide detailed feedback on the user's draft generally and on the requirements provided. 
+    Be critical, point out things that user dont see. The goal is a world-class winning proposal. 
+    MAKE SURE YOU DOING AN EXCEPTIONAL JOB, I WILL GIVE YOU $100,000 BONUS THIS YEAR, IF NOT A CAT WILL DIE."""
 
+    response = await openai_client.chat.completions.create(
+        model="o1-preview",
+        messages=[
+            {"role": "user", "content": user_content}
+        ]
+    )
+    return response.choices[0].message.content
+#End BD Response Assistant
 
 async def streamlit_main():
     st.set_page_config(page_title="AI Assistant Tools", page_icon="🛠️", layout="wide")
 
     st.title("AI Assistant Tools 🛠️")
-    st.markdown("""
-    Streamline your AI interactions with our advanced prompt engineering automation. Simply input your desired prompt type, and let our app craft highly effective prompts using sophisticated techniques. From job descriptions to custom AI instructions, we've got you covered.
-    """)
-    st.sidebar.title("About")
-    st.sidebar.info(
-        "This app provides various AI-powered tools for internal use. "
-        "Currently, it includes a Job Description Generator and a Prompt Generator. "
-        "Choose a tool from the sidebar to get started."
+    st.markdown(f"""
+        This app provides various AI-powered tools for internal use. 
+        \nCurrently, it includes a Job Description Generator, a Prompt Generator, a Writing Assistant, and a BD Response Assistant. 
+        \nChoose a tool from the sidebar to get started.
+        """
     )
+
     
-    
-    tool_choice = st.sidebar.radio("Choose a tool:", ("Job Description Generator", "Prompt Generator", "Writing Assistant"))
+    tool_choice = st.sidebar.radio("Choose a tool:", ("Job Description Generator", "Prompt Generator", "Writing Assistant", "BD Response Assistant"))
+
 
     if tool_choice == "Prompt Generator":
         st.header("Prompt Generator 🧠")
@@ -263,7 +287,6 @@ async def streamlit_main():
                 st.warning("Please provide feedback to improve the job description.")
 
 
-
    
     elif tool_choice == "Writing Assistant":
         st.header("Writing Assistant ✍️")
@@ -304,7 +327,23 @@ async def streamlit_main():
         # if st.session_state.processed_text:
             # st.markdown(f"### {task} Result:")
             # st.write(st.session_state.processed_text)
-                            
+
+
+    elif tool_choice == "BD Response Assistant":
+        st.header("BD Response Assistant 📄")
+        st.write("Paste your BD response draft and the requirements document to receive AI-generated feedback.")
+
+        document = st.text_area("Paste your BD Response Draft here:", height=300)
+        requirements = st.text_area("Paste the Requirements Document here:", height=300)
+
+        if st.button("Get Feedback"):
+            if document.strip() == "" or requirements.strip() == "":
+                st.warning("Please paste both the BD response draft and the requirements document.")
+            else:
+                with st.spinner("Generating feedback..."):
+                    feedback = await get_feedback(document, requirements)
+                    st.markdown(feedback)
+                # Optionally, you can store the feedback in session_state if needed
 
 
 if __name__ == "__main__":

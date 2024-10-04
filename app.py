@@ -331,19 +331,30 @@ async def streamlit_main():
 
     elif tool_choice == "BD Response Assistant":
         st.header("BD Response Assistant 📄")
+        
+        # Initialize session state variables for BD Response Assistant
+        if "bd_document" not in st.session_state:
+            st.session_state.bd_document = ""
+        if "bd_requirements" not in st.session_state:
+            st.session_state.bd_requirements = ""
+
         st.write("Paste your BD response draft and the requirements document to receive AI-generated feedback.")
 
-        document = st.text_area("Paste your BD Response Draft here:", height=300)
-        requirements = st.text_area("Paste the Requirements Document here:", height=300)
+        # Use session state for document and requirements
+        st.session_state.bd_document = st.text_area("Paste your BD Response Draft here:", 
+                                                    value=st.session_state.bd_document, 
+                                                    height=300)
+        st.session_state.bd_requirements = st.text_area("Paste the Requirements Document here:", 
+                                                        value=st.session_state.bd_requirements, 
+                                                        height=300)
 
         if st.button("Get Feedback"):
-            if document.strip() == "" or requirements.strip() == "":
+            if st.session_state.bd_document.strip() == "" or st.session_state.bd_requirements.strip() == "":
                 st.warning("Please paste both the BD response draft and the requirements document.")
             else:
                 with st.spinner("Generating feedback..."):
-                    feedback = await get_feedback(document, requirements)
+                    feedback = await get_feedback(st.session_state.bd_document, st.session_state.bd_requirements)
                     st.markdown(feedback)
-                # Optionally, you can store the feedback in session_state if needed
 
 
 if __name__ == "__main__":

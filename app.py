@@ -50,7 +50,7 @@ async def generate_job_description(job_title, additional_requirements):
     user_input = f"Job title: {job_title}. {additional_requirements}"
     
     response = await openai_client.chat.completions.create(
-        model="gpt-4o-2024-08-06",  # Changed from "gpt-4o" to "gpt-4"
+        model="gpt-4o",  # Changed from "gpt-4o" to "gpt-4"
         messages=[
             {"role": "system", "content": main_prompt},
             {"role": "user", "content": user_input}
@@ -177,8 +177,10 @@ async def streamlit_main():
                                   key="job_title_input")  # Added unique key
         additional_requirements = st.text_area("Enter any additional requirements (optional):", 
                                                value=st.session_state.additional_requirements,
-                                               placeholder="e.g., TS clearance, 5+ years of experience in Python, knowledge of machine learning",
+                                               placeholder="You can paste the PWS requirements here OR manually type: TS clearance, 5+ years of experience in Python, knowledge of machine learning, etc.",
                                                key="job_description_requirements")
+        st.info("Note: If you want the tool to strictly follow the requirements, include 'PWS' in the additional requirements box.")
+
 
 
         if st.button("Generate Job Description"):

@@ -5,6 +5,7 @@ import json
 import re
 from openai import AsyncOpenAI
 from anthropic import AsyncAnthropic
+import streamlit_mermaid as stmd
 
 # Initialize clients
 openai_client = AsyncOpenAI(api_key=st.secrets["OPENAI_API_KEY"])
@@ -144,7 +145,7 @@ User Feedback:
     async for chunk in response:
         if chunk.choices[0].delta.content is not None:
             yield chunk.choices[0].delta.content
-#End Job description generator:
+#End Job description generator
 
 
 #Writing tools
@@ -203,6 +204,53 @@ async def get_feedback(document, requirements):
     return response.choices[0].message.content
 #End BD Response Assistant
 
+
+
+async def generate_mermaid_diagram(description):
+    prompt = """
+    You are an expert in creating Mermaid diagrams. Based on the user's description, generate a Mermaid diagram code.
+    Make sure the code is valid and follows Mermaid syntax. Return only the Mermaid code, without any additional text or explanations, tags, or code block markers.
+    
+    
+    Example:
+    Bad output :```mermaid
+    graph TD
+        Start --> Water
+        Water --> HeatWater
+        HeatWater --> BoilingWater
+        BoilingWater --> AddGroundCoffee
+        AddGroundCoffee --> Brew
+        Brew --> Coffee
+        Coffee --> Enjoy
+    ```
+    
+    Good output:
+        graph TD
+            A[Start] --> B[Process 1]
+            B --> C[Process 2]
+            C --> D[End]
+            
+            
+    DO NOT INCLUDE THE "```mermaid"
+    """
+    
+    user_input = f"Create a Mermaid diagram for: {description}"
+    
+    response = await anthropic_client.messages.create(
+        model="claude-3-sonnet-20240229",
+        max_tokens=3000,
+        temperature=0,
+        system=prompt,
+        messages=[
+            {
+                "role": "user",
+                "content": user_input
+            }
+        ]
+    )
+    return response.content[0].text
+
+
 async def streamlit_main():
     st.set_page_config(page_title="AI Assistant Tools", page_icon="🛠️", layout="wide")
 
@@ -213,10 +261,8 @@ async def streamlit_main():
         \nChoose a tool from the sidebar to get started.
         """
     )
-
     
-    tool_choice = st.sidebar.radio("Choose a tool:", ("Job Description Generator", "Prompt Generator", "Writing Assistant", "BD Response Assistant"))
-
+    tool_choice = st.sidebar.radio("Choose a tool:", ("Job Description Generator", "Prompt Generator", "Writing Assistant", "BD Response Assistant", "Mermaid Diagram Generator"))
 
     if tool_choice == "Prompt Generator":
         st.header("Prompt Generator 🧠")
@@ -226,8 +272,6 @@ async def streamlit_main():
         if user_request:
             await prompt_generator(user_request)
             
-
-
     elif tool_choice == "Job Description Generator":
         st.header("Job Description Generator 📝")
         st.write("Enter the job title and any additional requirements to generate a high-quality job description.")
@@ -285,8 +329,6 @@ async def streamlit_main():
                 st.warning("Please generate a job description first.")
             else:
                 st.warning("Please provide feedback to improve the job description.")
-
-
    
     elif tool_choice == "Writing Assistant":
         st.header("Writing Assistant ✍️")
@@ -328,7 +370,6 @@ async def streamlit_main():
             # st.markdown(f"### {task} Result:")
             # st.write(st.session_state.processed_text)
 
-
     elif tool_choice == "BD Response Assistant":
         st.header("BD Response Assistant 📄")
         
@@ -356,6 +397,29 @@ async def streamlit_main():
                     feedback = await get_feedback(st.session_state.bd_document, st.session_state.bd_requirements)
                     st.markdown(feedback)
 
+    elif tool_choice == "Mermaid Diagram Generator":
+        st.header("Mermaid Diagram Generator 📊")
+        st.write("Generate Mermaid diagrams from text descriptions.")
+
+        description = st.text_area("Describe the diagram you want to create:", 
+                                placeholder="e.g., A flowchart showing the process of making coffee")
+
+        if st.button("Generate Diagram"):
+            if description:
+                with st.spinner("Generating Mermaid diagram..."):
+                    mermaid_code = await generate_mermaid_diagram(description)
+                    st.subheader("Generated Mermaid Diagram:")
+                    try:
+                        mermaid = stmd.st_mermaid(mermaid_code, height=None)
+                    except Exception as e:
+                        st.error(f"Error rendering Mermaid diagram: {str(e)}")
+                        st.text("Generated Mermaid code (for debugging):")
+                        st.code(mermaid_code, language="mermaid")
+                    else:
+                        st.subheader("Mermaid Code:")
+                        st.code(mermaid_code, language="mermaid")
+            else:
+                st.warning("Please enter a description for the diagram.")
 
 if __name__ == "__main__":
     asyncio.run(streamlit_main())

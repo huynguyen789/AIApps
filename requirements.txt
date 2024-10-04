@@ -68,3 +68,4 @@ typing_extensions==4.12.2
 tzdata==2024.1
 urllib3==2.2.2
 yarl==1.9.4
+streamlit_mermaid

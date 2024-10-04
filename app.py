@@ -146,7 +146,7 @@ async def process_text(user_input, task):
    
     prompts = {
         "grammar": "Correct the grammar in the following text, return the correct content, output in a format that's easy for the user to copy. Also, show what was corrected:",
-        "rewrite": "Rewrite the following text professionally and concisely. Maintain the core message while improving clarity and brevity:",
+        "rewrite": "Rewrite the following text professionally and concisely. Maintain the core message. Give few answers so user can select instead of only 1 option",
         "summarize": "Summarize the following text concisely, capturing the main points:",
         "explain": """Explain the following text in two parts in a super easy to way to understand and concise:
         1. Explain it in a super simple way like the user is a 12 years old, with example.
@@ -158,7 +158,7 @@ async def process_text(user_input, task):
     user_input = f'"{user_input}"'
     
     response = await openai_client.chat.completions.create(
-        model="gpt-4o-mini",
+        model="gpt-4o",
         messages=[
             {"role": "system", "content": prompts[task]},
             {"role": "user", "content": user_input}
@@ -267,21 +267,24 @@ async def streamlit_main():
    
     elif tool_choice == "Writing Assistant":
         st.header("Writing Assistant ✍️")
-        st.write("Improve your writing with AI-powered tools.")
+        st.write("Welcome to the Writing Assistant! Here you can improve your writing with AI-powered tools. Choose from the following options:")
+        st.write("1. Professional Rewrite: Enhance the professionalism of your text.")
+        st.write("2. Correct Grammar: Fix grammatical errors in your text.")
+        st.write("3. Summarize: Get a concise summary of your text.")
+        st.write("4. Explain: Simplify and explain your text.")
 
         if 'user_input' not in st.session_state:
             st.session_state.user_input = ""
         if 'task' not in st.session_state:
-            st.session_state.task = "Correct Grammar"
+            st.session_state.task = "Professional Rewrite"
         if 'processed_text' not in st.session_state:
             st.session_state.processed_text = ""
 
-        user_input = st.text_area("Enter your text:", height=200, key="user_input")
+        user_input = st.text_area("Enter your text (e.g., 'I ain't got no time for this.'):", height=200, key="user_input")
         
-        col1, col2 = st.columns(2)
-        task = col1.selectbox("Choose a task:", ["Correct Grammar", "Professional Rewrite", "Summarize", "Explain"], key="task")
+        task = st.selectbox("Choose a task:", ["Professional Rewrite", "Correct Grammar", "Summarize", "Explain"], key="task")
             
-        if col2.button("Process Text"):
+        if st.button("Process Text"):
             if user_input:
                 task_map = {
                     "Correct Grammar": "grammar",

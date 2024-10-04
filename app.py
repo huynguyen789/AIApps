@@ -143,17 +143,20 @@ async def prompt_generator(user_request):
 
 #Writing tools
 async def process_text(user_input, task):
+   
     prompts = {
         "grammar": "Correct the grammar in the following text, return the correct content, output in a format that's easy for the user to copy. Also, show what was corrected:",
         "rewrite": "Rewrite the following text professionally and concisely. Maintain the core message while improving clarity and brevity:",
         "summarize": "Summarize the following text concisely, capturing the main points:",
-        "explain": """Explain the following text in two parts:
-        1. Explain it as if you're talking to a 10-year-old child.
-        2. Then, explain it for an adult audience.
+        "explain": """Explain the following text in two parts in a super easy to way to understand and concise:
+        1. Explain it in a super simple way like the user is a 12 years old, with example.
+        2. Then, explain it in regular way.
         
         Make sure both explanations are clear and easy to understand."""
     }
-
+   
+    user_input = f'"{user_input}"'
+    
     response = await openai_client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
@@ -167,8 +170,9 @@ async def process_text(user_input, task):
     async for chunk in response:
         if chunk.choices[0].delta.content is not None:
             processed_content += chunk.choices[0].delta.content
+            yield chunk.choices[0].delta.content
 
-    return processed_content
+    # return processed_content
 #End Writing tools
 
 
@@ -242,7 +246,7 @@ async def streamlit_main():
         #     st.markdown("### Current Job Description")
         #     st.markdown(st.session_state.job_description)
                 
-        feedback = st.text_area("Provide feedback to improve the job description:", placeholder="What would you like to change or improve?")
+        feedback = st.text_area("Provide feedback to improve the job description:", placeholder="example: tailor for CBM+ projects, 7 years of experience instead of 5, etc...")
         
         if st.button("Improve Job Description"):
             if feedback and st.session_state.job_description:
@@ -258,31 +262,25 @@ async def streamlit_main():
             else:
                 st.warning("Please provide feedback to improve the job description.")
 
-        if tool_choice == "Writing Assistant":
-            st.header("Writing Assistant ✍️")
-            st.write("Improve your writing with AI-powered grammar correction.")
-
-            user_input = st.text_area("Enter your text for grammar correction:", height=200)
-            
-            if st.button("Correct Grammar"):
-                if user_input:
-                    with st.spinner("Correcting grammar..."):
-                        corrected_text = await grammar_corrector(user_input)
-                        st.markdown("### Corrected Text:")
-                        st.write(corrected_text)
-                else:
-                    st.warning("Please enter some text to correct.")
 
 
+   
     elif tool_choice == "Writing Assistant":
         st.header("Writing Assistant ✍️")
         st.write("Improve your writing with AI-powered tools.")
 
-        user_input = st.text_area("Enter your text:", height=200)
+        if 'user_input' not in st.session_state:
+            st.session_state.user_input = ""
+        if 'task' not in st.session_state:
+            st.session_state.task = "Correct Grammar"
+        if 'processed_text' not in st.session_state:
+            st.session_state.processed_text = ""
+
+        user_input = st.text_area("Enter your text:", height=200, key="user_input")
         
         col1, col2 = st.columns(2)
-        task = col1.selectbox("Choose a task:", ["Correct Grammar", "Professional Rewrite", "Summarize", "Explain"])
-        
+        task = col1.selectbox("Choose a task:", ["Correct Grammar", "Professional Rewrite", "Summarize", "Explain"], key="task")
+            
         if col2.button("Process Text"):
             if user_input:
                 task_map = {
@@ -291,13 +289,19 @@ async def streamlit_main():
                     "Summarize": "summarize",
                     "Explain": "explain"
                 }
+        
                 with st.spinner(f"Processing text ({task.lower()})..."):
-                    processed_text = await process_text(user_input, task_map[task])
-                    st.markdown(f"### {task} Result:")
-                    st.write(processed_text)
-            else:
-                st.warning("Please enter some text to process.")
-                    
+                    processed_text_placeholder = st.empty()
+                    full_content = ""
+                    async for content in process_text(user_input, task_map[task]):
+                        full_content += content
+                        processed_text_placeholder.markdown(full_content)
+                    st.session_state.processed_text = full_content
+
+        # if st.session_state.processed_text:
+            # st.markdown(f"### {task} Result:")
+            # st.write(st.session_state.processed_text)
+                            
 
 
 if __name__ == "__main__":

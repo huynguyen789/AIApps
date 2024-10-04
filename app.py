@@ -140,6 +140,39 @@ async def prompt_generator(user_request):
     
     return st.session_state.current_prompt
 
+
+#Writing tools
+async def process_text(user_input, task):
+    prompts = {
+        "grammar": "Correct the grammar in the following text, return the correct content, output in a format that's easy for the user to copy. Also, show what was corrected:",
+        "rewrite": "Rewrite the following text professionally and concisely. Maintain the core message while improving clarity and brevity:",
+        "summarize": "Summarize the following text concisely, capturing the main points:",
+        "explain": """Explain the following text in two parts:
+        1. Explain it as if you're talking to a 10-year-old child.
+        2. Then, explain it for an adult audience.
+        
+        Make sure both explanations are clear and easy to understand."""
+    }
+
+    response = await openai_client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": prompts[task]},
+            {"role": "user", "content": user_input}
+        ],
+        stream=True,
+    )
+    processed_content = ""
+
+    async for chunk in response:
+        if chunk.choices[0].delta.content is not None:
+            processed_content += chunk.choices[0].delta.content
+
+    return processed_content
+#End Writing tools
+
+
+
 async def streamlit_main():
     st.set_page_config(page_title="AI Assistant Tools", page_icon="🛠️", layout="wide")
 
@@ -147,8 +180,15 @@ async def streamlit_main():
     st.markdown("""
     Streamline your AI interactions with our advanced prompt engineering automation. Simply input your desired prompt type, and let our app craft highly effective prompts using sophisticated techniques. From job descriptions to custom AI instructions, we've got you covered.
     """)
+    st.sidebar.title("About")
+    st.sidebar.info(
+        "This app provides various AI-powered tools for internal use. "
+        "Currently, it includes a Job Description Generator and a Prompt Generator. "
+        "Choose a tool from the sidebar to get started."
+    )
     
-    tool_choice = st.sidebar.radio("Choose a tool:", ("Job Description Generator", "Prompt Generator"  ))
+    
+    tool_choice = st.sidebar.radio("Choose a tool:", ("Job Description Generator", "Prompt Generator", "Writing Assistant"))
 
     if tool_choice == "Prompt Generator":
         st.header("Prompt Generator 🧠")
@@ -218,15 +258,47 @@ async def streamlit_main():
             else:
                 st.warning("Please provide feedback to improve the job description.")
 
+        if tool_choice == "Writing Assistant":
+            st.header("Writing Assistant ✍️")
+            st.write("Improve your writing with AI-powered grammar correction.")
+
+            user_input = st.text_area("Enter your text for grammar correction:", height=200)
+            
+            if st.button("Correct Grammar"):
+                if user_input:
+                    with st.spinner("Correcting grammar..."):
+                        corrected_text = await grammar_corrector(user_input)
+                        st.markdown("### Corrected Text:")
+                        st.write(corrected_text)
+                else:
+                    st.warning("Please enter some text to correct.")
 
 
+    elif tool_choice == "Writing Assistant":
+        st.header("Writing Assistant ✍️")
+        st.write("Improve your writing with AI-powered tools.")
 
-    st.sidebar.title("About")
-    st.sidebar.info(
-        "This app provides various AI-powered tools for internal use. "
-        "Currently, it includes a Job Description Generator and a Prompt Generator. "
-        "Choose a tool from the sidebar to get started."
-    )
+        user_input = st.text_area("Enter your text:", height=200)
+        
+        col1, col2 = st.columns(2)
+        task = col1.selectbox("Choose a task:", ["Correct Grammar", "Professional Rewrite", "Summarize", "Explain"])
+        
+        if col2.button("Process Text"):
+            if user_input:
+                task_map = {
+                    "Correct Grammar": "grammar",
+                    "Professional Rewrite": "rewrite",
+                    "Summarize": "summarize",
+                    "Explain": "explain"
+                }
+                with st.spinner(f"Processing text ({task.lower()})..."):
+                    processed_text = await process_text(user_input, task_map[task])
+                    st.markdown(f"### {task} Result:")
+                    st.write(processed_text)
+            else:
+                st.warning("Please enter some text to process.")
+                    
+
 
 if __name__ == "__main__":
     asyncio.run(streamlit_main())

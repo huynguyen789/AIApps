@@ -6,6 +6,8 @@ import re
 from openai import AsyncOpenAI
 from anthropic import AsyncAnthropic
 import streamlit_mermaid as stmd
+import base64
+import requests
 
 # Initialize clients
 openai_client = AsyncOpenAI(api_key=st.secrets["OPENAI_API_KEY"])
@@ -206,6 +208,7 @@ async def get_feedback(document, requirements):
 
 
 
+#Text to diagram
 async def generate_mermaid_diagram(description):
     prompt = """
     You are an expert in creating Mermaid diagrams. Based on the user's description, generate a Mermaid diagram code.
@@ -240,6 +243,40 @@ async def generate_mermaid_diagram(description):
     )
     return response.content[0].text
 
+def mermaid_to_svg(mermaid_code):
+    response = requests.post(
+        'https://mermaid.ink/svg',
+        json={'mermaid': mermaid_code}
+    )
+    if response.status_code == 200 and response.content.startswith(b'<svg'):
+        return response.content
+    else:
+        return None
+    
+def generate_mermaid_chart(mermaid_code, format='png'):
+    # Mermaid Live Editor API endpoint
+    url = 'https://mermaid.ink/img/'
+
+    # Encode the Mermaid code
+    encoded_code = base64.urlsafe_b64encode(mermaid_code.encode('utf-8')).decode('utf-8')
+
+    # Construct the full URL
+    full_url = f"{url}{encoded_code}"
+
+    # Add format parameter if not PNG
+    if format.lower() != 'png':
+        full_url += f"?type={format}"
+
+    # Send GET request to the API
+    response = requests.get(full_url)
+
+    # Check if the request was successful
+    if response.status_code == 200:
+        return response.content
+    else:
+        return None    
+    
+    
 
 async def streamlit_main():
     st.set_page_config(page_title="AI Assistant Tools", page_icon="🛠️", layout="wide")
@@ -397,26 +434,62 @@ async def streamlit_main():
         3. A flowchart of a user registration process
         """, language="markdown")
 
-        description = st.text_area("Describe the diagram you want to create:", 
-                                placeholder="e.g., A flowchart showing the steps to plan a vacation, a flowchart of a MLOps system")
+        # Initialize session state for diagram description and Mermaid code
+        if "diagram_description" not in st.session_state:
+            st.session_state.diagram_description = ""
+        if "mermaid_code" not in st.session_state:
+            st.session_state.mermaid_code = ""
+
+        # Use session state for the text area
+        st.session_state.diagram_description = st.text_area(
+            "Describe the diagram you want to create:", 
+            value=st.session_state.diagram_description,
+            placeholder="e.g., A flowchart showing the steps to plan a vacation, a flowchart of a MLOps system"
+        )
 
         if st.button("Create Diagram"):
-            if description:
+            if st.session_state.diagram_description:
                 with st.spinner("Creating your diagram..."):
-                    mermaid_code = await generate_mermaid_diagram(description)
+                    st.session_state.mermaid_code = await generate_mermaid_diagram(st.session_state.diagram_description)
                     st.subheader("Your Generated Diagram:")
                     try:
-                        mermaid = stmd.st_mermaid(mermaid_code, height=800)
+                        mermaid = stmd.st_mermaid(st.session_state.mermaid_code, height=800)
                     except Exception as e:
                         st.error(f"Oops! There was an error creating your diagram: {str(e)}")
                         st.text("Technical details (for troubleshooting):")
-                        st.code(mermaid_code, language="mermaid")
+                        st.code(st.session_state.mermaid_code, language="mermaid")
                     else:
-                        st.subheader("Diagram Code (for advanced users):")
-                        st.code(mermaid_code, language="mermaid")
-                        st.info("You can copy the code and edit the diagram in [Mermaid Live](https://mermaid.live/).")
+                        st.subheader("Diagram Code:")
+                        st.code(st.session_state.mermaid_code, language="mermaid")
+                        st.info("You can copy this code and edit the diagram in [Mermaid Live](https://mermaid.live/).")
+                        
+                        # Generate PNG image
+                        png_image = generate_mermaid_chart(st.session_state.mermaid_code, format='png')
+                        if png_image:
+                            st.download_button(
+                                label="Download Diagram as PNG",
+                                data=png_image,
+                                file_name="mermaid_diagram.png",
+                                mime="image/png"
+                            )
+                        else:
+                            st.warning("Unable to generate a downloadable PNG. You can still use the Mermaid code above.")
+
+                        # Generate SVG image
+                        svg_image = generate_mermaid_chart(st.session_state.mermaid_code, format='svg')
+                        if svg_image:
+                            st.download_button(
+                                label="Download Diagram as SVG",
+                                data=svg_image,
+                                file_name="mermaid_diagram.svg",
+                                mime="image/svg+xml"
+                            )
+                        else:
+                            st.warning("Unable to generate a downloadable SVG. You can still use the Mermaid code above.")
+
             else:
                 st.warning("Please enter a description for your diagram.")
+
 
 if __name__ == "__main__":
     asyncio.run(streamlit_main())

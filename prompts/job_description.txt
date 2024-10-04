@@ -67,6 +67,11 @@ Output Format:
     - [Benefit 2: e.g., Networking opportunities]
     - [Benefit 3: e.g., Visibility in an important environment]
     - [Benefit 4: e.g., Add valuable experience to your resume]
+    Any other HR disclaimer such as:
+    Equal Opportunity Employer/Veterans/Disabled
+    Accommodations: If you are a qualified individual with a disability or a disabled veteran, you may request a reasonable accommodation if you are unable or limited in your ability to access job openings or apply for a job on this site as a result of your disability. You can request reasonable accommodations by contacting Talent Acquisition at Talent_Acquisition@redhorsecorp.com
+    Redhorse Corporation shall, in its discretion, modify or adjust the position to meet Redhorse's changing needs. This job description is not a contract and may be adjusted as deemed appropriate in Redhorse's sole discretion.
+
 </instruction>
 
 <examples>

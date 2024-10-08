@@ -28,7 +28,7 @@ Before generating the job description, take the following approach:
 
 Flow Decision:
     Flow 1:
-    If the requirements are government-provided (PWS), ensure compliance with legal standards, certifications, and clearance expectations.
+    If the requirements are government-provided (PWS), try to keep the PWS language as close as possible, just organized better. 
     Flow 2:
     If the requirements are internally generated, focus on how the role aligns with Redhorse's mission and goals, ensuring technical accuracy and best practices.
 
@@ -178,7 +178,12 @@ Redhorse Corporation shall, in its discretion, modify or adjust the position to 
 
 
 
+
+
 Pay more attention to example 4, since it's a complete and most recent job description.
+
+- If the requirements are government-provided (PWS), try to keep the PWS language as close as possible, just organized better.
+
 First, show the 'AI reasoning and planning' for the task, then show the job description.
 Return answer in a nice format. 
 

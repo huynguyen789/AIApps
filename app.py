@@ -406,7 +406,7 @@ async def streamlit_main():
         if "bd_requirements" not in st.session_state:
             st.session_state.bd_requirements = ""
 
-        st.write("Paste your BD response draft and the requirements document to receive AI-generated feedback.")
+        st.write("Paste your BD response draft and the requirements document to receive feedback from one of the most advanced AI systems available. This is not the free ChatGPT AI, but a highly sophisticated tool designed specifically for BD response analysis.")
 
         # Use session state for document and requirements
         st.session_state.bd_document = st.text_area("Paste your BD Response Draft here:", 

@@ -54,7 +54,7 @@ def remove_analysis(prompt):
 
 
 async def prompt_generator(user_request):
-    optimizer_model = "claude-3-sonnet-20240229"  # or "gpt-4-0125-preview"
+    optimizer_model = "claude-3-5-sonnet-20240620"  # or "gpt-4-0125-preview"
     
     if 'current_prompt' not in st.session_state:
         st.session_state.current_prompt = None
@@ -235,7 +235,7 @@ async def generate_mermaid_diagram(description):
     user_input = f"Create a Mermaid diagram for: {description}"
     
     response = await anthropic_client.messages.create(
-        model="claude-3-sonnet-20240229",
+        model="claude-3-5-sonnet-20240620",
         max_tokens=3000,
         temperature=0,
         system=prompt,
@@ -404,7 +404,7 @@ async def streamlit_main():
         """
     )
     
-    tool_choice = st.sidebar.radio("Choose a tool:", ("Job Description Generator", "Prompt Generator", "Writing Assistant", "BD Response Assistant", "Text to Diagram Converter", "Monthly Status Report Generator"))
+    tool_choice = st.sidebar.radio("Choose a tool:", ("Job Description Generator", "Monthly Status Report Generator", "BD Response Assistant", "Prompt Generator", "Writing Assistant", "Text to Diagram Converter"))
 
     if tool_choice == "Prompt Generator":
         st.header("Prompt Generator 🧠")
@@ -428,7 +428,13 @@ async def streamlit_main():
         job_title = st.text_input("Enter the job title:", 
                                   value=st.session_state.job_title, 
                                   placeholder="e.g., Senior Software Engineer",
-                                  key="job_title_input")  # Added unique key
+                                  key="job_title_input")
+
+        # File upload option for additional requirements
+        req_file = st.file_uploader("Upload additional requirements (Word or Text file) - Optional", type=['docx', 'txt'])
+        if req_file:
+            st.session_state.additional_requirements = read_file(req_file)
+        
         additional_requirements = st.text_area("Enter any additional requirements (optional):", 
                                                value=st.session_state.additional_requirements,
                                                placeholder="You can paste the PWS requirements here OR manually type: TS clearance, 5+ years of experience in Python, knowledge of machine learning, etc.",
@@ -487,10 +493,18 @@ async def streamlit_main():
         if 'processed_text' not in st.session_state:
             st.session_state.processed_text = ""
 
-        user_input = st.text_area("Enter your text (e.g., 'I ain't got no time for this.'):", height=200, key="user_input")
+        # File upload option for user input
+        input_file = st.file_uploader("Upload your text (Word or Text file)", type=['docx', 'txt'])
+        if input_file:
+            st.session_state.user_input = read_file(input_file)
+        
+        user_input = st.text_area("Or enter your text here:", 
+                                  value=st.session_state.user_input,
+                                  height=200, 
+                                  key="user_input")
         
         task = st.selectbox("Choose a task:", ["Professional Rewrite", "Correct Grammar", "Summarize", "Explain"], key="task")
-            
+        
         if st.button("Process Text"):
             if user_input:
                 task_map = {
@@ -515,25 +529,35 @@ async def streamlit_main():
     elif tool_choice == "BD Response Assistant":
         st.header("BD Response Assistant 📄")
         
-        # Initialize session state variables for BD Response Assistant
+        st.write("Welcome! We're here to help you refine your BD response. You can either paste your draft and requirements or upload files.")
+
+        # Initialize session state variables
         if "bd_document" not in st.session_state:
             st.session_state.bd_document = ""
         if "bd_requirements" not in st.session_state:
             st.session_state.bd_requirements = ""
 
-        st.write("Paste your BD response draft and the requirements document to receive feedback from one of the most advanced AI systems available. This is not the free ChatGPT AI, but a highly sophisticated tool designed specifically for BD response analysis.")
-
-        # Use session state for document and requirements
-        st.session_state.bd_document = st.text_area("Paste your BD Response Draft here:", 
-                                                    value=st.session_state.bd_document, 
-                                                    height=300)
-        st.session_state.bd_requirements = st.text_area("Paste the Requirements Document here:", 
-                                                        value=st.session_state.bd_requirements, 
+        # File upload option for BD response draft
+        bd_file = st.file_uploader("Upload your BD Response Draft (Word or Text file)", type=['docx', 'txt'])
+        if bd_file:
+            st.session_state.bd_document = read_file(bd_file)
+        else:
+            st.session_state.bd_document = st.text_area("Or paste your BD Response Draft here:", 
+                                                        value=st.session_state.bd_document, 
                                                         height=300)
+
+        # File upload option for requirements document
+        req_file = st.file_uploader("Upload the Requirements Document (Word or Text file)", type=['docx', 'txt'])
+        if req_file:
+            st.session_state.bd_requirements = read_file(req_file)
+        else:
+            st.session_state.bd_requirements = st.text_area("Or paste the Requirements Document here:", 
+                                                            value=st.session_state.bd_requirements, 
+                                                            height=300)
 
         if st.button("Get Feedback"):
             if st.session_state.bd_document.strip() == "" or st.session_state.bd_requirements.strip() == "":
-                st.warning("Please paste both the BD response draft and the requirements document.")
+                st.warning("Please provide both the BD response draft and the requirements document.")
             else:
                 with st.spinner("Generating feedback..."):
                     feedback = await get_feedback(st.session_state.bd_document, st.session_state.bd_requirements)
@@ -597,21 +621,30 @@ async def streamlit_main():
             st.session_state.diagram_description = ""
             st.session_state.mermaid_code = ""
             st.rerun()
-
     elif tool_choice == "Monthly Status Report Generator":
         st.header("Monthly Status Report Generator 📊")
-        st.write("Generate a monthly status report based on input files and an example.")
+        st.write("""
+        Welcome to the Monthly Status Report Generator! This tool simplifies the process of creating 
+        comprehensive monthly status reports by combining individual reports into a single, cohesive document. 
+        Here's how it works:
+        
+        1. Upload your individual monthly status reports (Word or Text files)
+        2. Choose an AI model to process the reports
+        3. Generate a combined report with just one click
+        4. Download the final report as a Word document
+        
+        Get started by uploading your files below!
+        """)
 
         uploaded_files = st.file_uploader("Upload input files (Word or Text)", type=['docx', 'txt'], accept_multiple_files=True)
 
         if uploaded_files:
             master_content = process_input_files(uploaded_files)
-            # #show master content in markdown
-            # st.markdown(master_content)
             with open("./example/example.txt", 'r') as file:
                 example_content = file.read()
 
             model_choice = st.selectbox("Choose AI model:", ["gemini", "gpt4", "claude"])
+            st.info("We recommend using the Gemini model for optimal performance.")
 
             if st.button("Generate Report"):
                 report_placeholder = st.empty()

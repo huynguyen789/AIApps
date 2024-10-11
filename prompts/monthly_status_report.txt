@@ -1,0 +1,35 @@
+    You are tasked with creating a Monthly Status Report based on the following information:
+
+    1. Master File Content (combined MSR files):
+    {master_content}
+
+    2. Example Report Format (example of a combined MSR file output):
+    {example_content}
+
+
+
+
+
+
+    Please generate a Monthly Status Report following the structure and style of the example report, 
+    using the information provided in the master file.
+
+    - Ensure that you maintain the accuracy of the information from the master file (only fix grammar, do not change the information)
+    - Follow the formatting of the example report.
+    - in the "Work Performed During..." section: Make sure to separate the work of each person. Put it under each name. 
+    - Each Task Order may have sub-division, make sure you group the people correctly. Ex: Federal Facilities Division (FFD) has Administrative, Financial and Professional Support Services. Make sure you put people under correct one. 
+    - Your generated report should be comprehensive, accurate, and well-structured in Markdown format.
+
+    Do not:
+    - Return markdown tags (ex: ```markdown)
+    - Do not combined people work under 1 block(ex: A & B: their works....), in the "Work Performed During..." section
+    
+    Use Markdown to represent the following:
+    - Headings
+    - Bullet points
+    - Bold for emphasis
+    - Tables where applicable
+
+    
+  
+    

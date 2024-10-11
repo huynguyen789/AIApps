@@ -8,6 +8,11 @@ from anthropic import AsyncAnthropic
 import streamlit_mermaid as stmd
 import base64
 import requests
+import google.generativeai as genai
+from docx import Document
+import pypandoc
+import tempfile
+import anthropic
 
 # Initialize clients
 openai_client = AsyncOpenAI(api_key=st.secrets["OPENAI_API_KEY"])
@@ -278,6 +283,116 @@ def generate_mermaid_chart(mermaid_code, format='png'):
     
     
 
+# Monthly Status Report Generator
+def setup_ai_model(model_name: str):
+    if model_name == "gemini":
+        api_key = st.secrets["GOOGLE_API_KEY"]
+        genai.configure(api_key=api_key)
+        
+        generation_config = {
+            "temperature": 0,
+            "max_output_tokens": 8192,
+        }
+        
+        safety_settings = [
+            {"category": "HARM_CATEGORY_DANGEROUS", "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+        ]
+        
+        return genai.GenerativeModel(
+            model_name="gemini-1.5-pro",
+            generation_config=generation_config,
+            safety_settings=safety_settings
+        )
+    elif model_name == "claude":
+        return st.secrets["ANTHROPIC_API_KEY"]
+    elif model_name == "gpt4":
+        return openai_client
+    else:
+        raise ValueError(f"Unsupported model: {model_name}")
+
+async def generate_monthly_status_report(model_name: str, master_content: str, example_content: str):
+    prompt = load_prompt("monthly_status_report.txt")
+    formatted_prompt = prompt.format(
+        master_content=master_content,
+        example_content=example_content
+    )
+    
+    model = setup_ai_model(model_name)
+    
+    try:
+        if model_name == "gemini":
+            response = model.generate_content(formatted_prompt, stream=True)
+            for chunk in response:
+                if chunk.text:
+                    yield chunk.text
+        elif model_name == "claude":
+            async with anthropic.AsyncClient(api_key=st.secrets["ANTHROPIC_API_KEY"]) as aclient:
+                async with aclient.messages.stream(
+                    model="claude-3-5-sonnet-20240620",
+                    max_tokens=4096,
+                    temperature=0,
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": formatted_prompt
+                        }
+                    ]
+                ) as stream:
+                    async for text in stream.text_stream:
+                        yield text
+        elif model_name == "gpt4":
+            stream = await openai_client.chat.completions.create(
+                model="gpt-4o",
+                messages=[{"role": "user", "content": formatted_prompt}],
+                max_tokens=4096,
+                temperature=0,
+                stream=True
+            )
+            async for chunk in stream:
+                if chunk.choices[0].delta.content is not None:
+                    yield chunk.choices[0].delta.content
+    except Exception as e:
+        yield f"An error occurred: {e}"
+
+def read_file(file):
+    if file.name.endswith('.docx'):
+        doc = Document(file)
+        return '\n'.join([para.text for para in doc.paragraphs])
+    elif file.name.endswith('.txt'):
+        return file.getvalue().decode('utf-8')
+    else:
+        raise ValueError(f"Unsupported file type: {file.name}")
+
+def process_input_files(files):
+    input_docs = {}
+    for file in files:
+        content = read_file(file)
+        input_docs[file.name] = content
+    
+    # Format the master content with XML-like tags
+    master_content = "\n\n\n".join([
+        f"<file:{filename}>\n{content}\n</file:{filename}>"
+        for filename, content in input_docs.items()
+    ])
+    
+    return master_content
+
+def save_markdown_to_file(markdown_content: str, file_path: str):
+    with open(file_path, 'w') as md_file:
+        md_file.write(markdown_content)
+
+def convert_markdown_to_docx(markdown_file_path: str, output_file_path: str):
+    pypandoc.convert_file(markdown_file_path, 'docx', outputfile=output_file_path)
+#End Monthly Status Report Generator
+#########################################################
+
+
+
+# Modify the streamlit_main function
 async def streamlit_main():
     st.set_page_config(page_title="AI Assistant Tools", page_icon="🛠️", layout="wide")
 
@@ -289,7 +404,7 @@ async def streamlit_main():
         """
     )
     
-    tool_choice = st.sidebar.radio("Choose a tool:", ("Job Description Generator", "Prompt Generator", "Writing Assistant", "BD Response Assistant", "Text to Diagram Converter"))
+    tool_choice = st.sidebar.radio("Choose a tool:", ("Job Description Generator", "Prompt Generator", "Writing Assistant", "BD Response Assistant", "Text to Diagram Converter", "Monthly Status Report Generator"))
 
     if tool_choice == "Prompt Generator":
         st.header("Prompt Generator 🧠")
@@ -482,6 +597,50 @@ async def streamlit_main():
             st.session_state.diagram_description = ""
             st.session_state.mermaid_code = ""
             st.rerun()
+
+    elif tool_choice == "Monthly Status Report Generator":
+        st.header("Monthly Status Report Generator 📊")
+        st.write("Generate a monthly status report based on input files and an example.")
+
+        uploaded_files = st.file_uploader("Upload input files (Word or Text)", type=['docx', 'txt'], accept_multiple_files=True)
+
+        if uploaded_files:
+            master_content = process_input_files(uploaded_files)
+            # #show master content in markdown
+            # st.markdown(master_content)
+            with open("./example/example.txt", 'r') as file:
+                example_content = file.read()
+
+            model_choice = st.selectbox("Choose AI model:", ["gemini", "gpt4", "claude"])
+
+            if st.button("Generate Report"):
+                report_placeholder = st.empty()
+                report_content = ""
+                
+                async for chunk in generate_monthly_status_report(model_choice, master_content, example_content):
+                    report_content += chunk
+                    report_placeholder.markdown(report_content + "▌")
+                
+                report_placeholder.markdown(report_content)
+
+                # Save the report as Word
+                with tempfile.NamedTemporaryFile(delete=False, suffix='.md') as tmp_md:
+                    save_markdown_to_file(report_content, tmp_md.name)
+                
+                with tempfile.NamedTemporaryFile(delete=False, suffix='.docx') as tmp_docx:
+                    convert_markdown_to_docx(tmp_md.name, tmp_docx.name)
+                
+                # Provide download link for Word report
+                st.download_button(
+                    label="Download Word Report",
+                    data=open(tmp_docx.name, 'rb').read(),
+                    file_name="monthly_status_report.docx",
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                )
+
+                # Clean up temporary files
+                os.unlink(tmp_md.name)
+                os.unlink(tmp_docx.name)
 
 if __name__ == "__main__":
     asyncio.run(streamlit_main())

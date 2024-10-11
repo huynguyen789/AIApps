@@ -1,0 +1,261 @@
+<example input>
+File: Monica Chavez MSR Sep.docx
+Content:       
+
+Monthly Status Report # --
+
+HQ0034-23-F-0308
+Task Order 8
+Business Integration Division (BID)
+Financial Services Support
+
+For Work Performed:
+
+Month Year
+September
+
+Submitted to:
+
+Ms. Lisa Robinson 
+Contracting Officer’s Representative
+Washington Headquarters Service (WHS)
+Acquisition Directorate (AD)
+1155 Defense Pentagon Room 5B951
+Washington, DC 20301-1155
+Lisa.a.robinson52.civ@mail.mil  
+(703) 697-1097
+
+
+
+Submitted by:
+
+Adrian Nicholas
+Redhorse Corporation
+1777 N. Kent St, Suite 1200
+Arlington, VA 22209 
+adrian.nicholas@redhorsecorp.com 
+(347) 204-812
+Financial Services Support Team
+Monica Chavez
+
+Work Performed During Month Year
+Financial Services Support 
+ Enter new bullet points below, in green highlight only. IF NO NEW BULLETPOINTS ARE ADDED, WRITE ‘NO NEW BULLET POINTS’ – MAKE SURE GREEN HIGHLIGHT REMAINS. 
+I worked on Labor Reports sent by one of our clients FOSD, by reviewing each project that was charge for labor, making sure there are not extra charges, and verifying that the account has funds to pay for the service before submitting to the Financial Approving Team. (FMD)
+For the past few months, I was able to process all FY19 Material Cost Transfers, for two different Divisions SPD and FOSD, the timeline was successfully achieved. And our FMD director its pleased of having all the projects closed before the end of the Fiscal Year.
+I worked on Returning Funds to the clients on projects from divisions (SPD & FOSD) that was closed and ready to expire next week. By doing this the division will avoid losing the money that is on the specific project.
+Monitored the execution (i.e., obligation and expenditures of funds) of the division's approved procurement funds budgets to ensure that funds are properly allocated and are being spent in a timely manner in support of authorized management objectives.
+Responsible for maintaining an accurate audit trail to separately track, record, and report the status of each funding document to ensure proper use of all funds (Active, expired, and canceled)
+Develop and update accounting records to show current funds resources broken out by years, fund source, obligation status of funds on a fiscal year basis. 
+
+Deliverables Completed 
+Monthly Status Report 
+Provided financial services support.
+Additional information you feel is relevant. 
+
+Highlights
+Additional information you feel is relevant. 
+
+
+Issues/Resolutions
+Issue:  None
+Resolution: None
+Planned Work for Next Two Months
+Financial Services Support
+Enter new bullet points below, in green highlight only. IF NO NEW BULLETPOINTS ARE ADDED, WRITE ‘NO NEW BULLET POINTS’ – MAKE SURE GREEN HIGHLIGHT REMAINS. 
+Learning new things to assist My Office and being able to get more system access to be successful with my daily task.
+Keep all logs and reports up to date as needed per the RIPD office.
+Continuing with daily and monthly SOF & O2C, P2P reports for the different divisions.
+
+
+
+Leave
+
+Recommendations 
+None
+Contractual/Staffing Actions
+None
+--------------------------------------------------
+
+
+File: Johanna Uquillas MSR September 2024.docx
+Content:       
+
+
+
+Monthly Status Report # --
+
+HQ0034-23-F-0308
+Task Order 8
+Business Integration Division (BID)
+Financial Services Support
+
+
+
+For Work Performed:
+
+SEPTEMBER 2024
+
+Submitted to:
+
+Mrs. Tina Hall  
+Contracting Officer’s Representative
+Washington Headquarters Service (WHS)
+Acquisition Directorate (AD)
+1155 Defense Pentagon Room 5B951
+Washington, DC 20301-1155
+Lisa.a.robinson52.civ@mail.mil  
+(202) 819 - 2679
+
+
+
+Submitted by:
+
+Adrian Nicholas
+Redhorse Corporation
+1777 N. Kent St, Suite 1200
+Arlington, VA 22209 
+adrian.nicholas@redhorsecorp.com 
+(347) 204-812
+Financial Services Support Team
+ Monica Chavez
+Johanna Uquillas
+
+
+Work Performed During MONTH YEAR  
+ 
+Financial Services Support 
+Worked on Daily Status of Funds Reports on behalf of the divisions for O&M, PRMRF, and MILCON. 
+Processed incoming MIPRS on behalf of BMF and PRMRF.
+Worked on processing Return of Funds on behalf of our customers.
+Provided customers with MIPR 448-2 Acceptances
+Worked on Return of Funds on behalf of our customers.
+    
+Deliverables Completed 
+Monthly Status Report
+Financial Support and Assistance 
+
+Highlights
+Completed Power Automate training through DISA which improved by ability to be more efficient. 
+Completed Advancing with Excel training through DISA which improved by ability to display data in Excel.
+
+Issues/Resolutions
+Issue:  None
+Resolution: None
+Planned Work for Next Two Months
+Financial Services Support
+Continue attending various trainings to better my skills.
+Continue training for my role and responsibilities.
+Assist in all requests for RIPD Division.
+Monitor fiscal year end tasks to be prepared for next fiscal year.
+Be available and willing to learn anything new. 
+Leave
+
+Recommendations 
+None
+Contractual/Staffing Actions
+None
+--------------------------------------------------
+</example input>
+
+
+
+
+
+<example output>
+File: MSR 12 HQ0034-23-F-0308 Business Integration Division (BID) September 2024.docx
+Content:
+
+# Monthly Status Report # 12
+
+**HQ0034-23-F-0308**  
+**Task Order 8**  
+**Resources and Integrated Programs Division (RIPD)**  
+**Financial Services Support**
+
+## For Work Performed:  
+**September 2024**  
+
+### Submitted to:  
+Mrs. Tina Hall  
+Contracting Officer’s Representative  
+Washington Headquarters Service (WHS)  
+Acquisition Directorate (AD)  
+1155 Defense Pentagon Room 2E1011  
+Washington, DC 20301-1155  
+tina.m.hall70.civ@mail.mil  
+(202) 819-2679
+
+### Submitted by:  
+Adrian Nicholas  
+Redhorse Corporation  
+1777 N. Kent St, Suite 1200  
+Arlington, VA 22209  
+adrian.nicholas@redhorsecorp.com  
+(347) 204-8125
+
+---
+
+## Financial Services Support Team  
+- Monica Chavez  
+- Johanna Uquillas
+
+---
+
+### Work Performed During September 2024  
+**Financial Services Support**  
+
+#### Monica Chavez  
+- I worked on Labor Reports sent by one of our clients FOSD. I assisted my Gov’t lead by reviewing each project that was charged for labor, ensuring there are no extra charges, and verifying the account has funds to pay for the service before submitting to the Financial Approving Team.  
+- I processed all FY19 Material Cost Transfers for two different Divisions SPD and FOSD, successfully achieving the timeline. Our FMD Director is pleased to have all the projects closed before the end of the Fiscal Year.  
+- I worked on returning funds to the client on projects from divisions (SPD & FOSD), which were closed and ready to expire next week. By doing this, the division avoided losing the money for the project.  
+- I monitored the execution (i.e., obligation and expenditures of funds) of the division's approved procurement funds budgets to ensure funds are properly allocated and being spent in a timely manner in support of authorized management objectives.  
+- I was responsible for maintaining an accurate audit trail to separately track, record, and report the status of each funding document to ensure proper use of all funds (Active, expired, and canceled).  
+- I developed and updated accounting records to show current funds resources broken out by years, fund source, and the obligation status of funds on a fiscal year basis.
+
+#### Johanna Uquillas  
+- I worked on Daily Status of Funds Reports on behalf of the divisions for O&M, PRMRF, and MILCON, which improves the ability for management to track the budget.  
+- I processed incoming MIPRS on behalf of BMF and PRMRF, which improved the ability for other divisions to provide their customers with acceptances.  
+- I worked on processing Return of Funds on behalf of our customers, which improved the fiscal year-end processes of closing out FY19.  
+- I worked on pulling MIPR 448-2 Acceptances in a timely manner on behalf of our customers, which improved fiscal year-end processes by completing tasks before the loss of access to the system.  
+- I worked on Cost Transfers on behalf of our PRMRF and BMF customers, which improved the accuracy of the status of funds.
+
+---
+
+## Deliverables Completed  
+- Monthly Status Report  
+- Provided administrative, financial, and professional services support.
+
+---
+
+## Highlights  
+- None
+
+---
+
+## Issues/Resolutions  
+- **Issue:** None  
+- **Resolution:** None
+
+---
+
+## Planned Work for Next Two Months  
+- Continued financial services support.
+
+---
+
+## Leave  
+| Name           | Planned Leave September | Planned Leave October |
+|----------------|-------------------------|-----------------------|
+| Monica Chavez  | NA                      | NA                    |
+| Johanna Uquillas | NA                     | NA                    |
+
+---
+
+## Recommendations  
+- None
+
+---
+
+## Contractual/Staffing Actions  
+- None

@@ -393,6 +393,8 @@ def convert_markdown_to_docx(markdown_file_path: str, output_file_path: str):
 #End Monthly Status Report Generator
 #########################################################
 
+
+
 # Add the new functions for the search and summarize tool
 def clean_content(soup):
     # Remove unnecessary elements
@@ -412,7 +414,7 @@ def clean_content(soup):
     if main_content:
         # Extract text from relevant elements
         content = []
-        for elem in main_content.find_all(['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'blockquote', 'div', 'span', 'pre']):
+        for elem in main_content.find_all(['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'blockquote', 'div', 'span', 'pre', 'img', 'table', 'a']):
             # Skip elements likely to contain metadata or navigation
             if 'class' in elem.attrs and any(c in ['crawler-post-meta', 'topic-category', 'nav', 'menu'] for c in elem['class']):
                 continue
@@ -421,6 +423,22 @@ def clean_content(soup):
             if elem.name == 'pre' or (elem.name == 'div' and 'class' in elem.attrs and 'code' in elem['class']):
                 code_content = elem.get_text(strip=True)
                 content.append(f"```\n{code_content}\n```")
+            # Handle images
+            elif elem.name == 'img' and elem.get('alt'):
+                content.append(f"[Image: {elem['alt']}]")
+            # Handle tables
+            elif elem.name == 'table':
+                table_content = []
+                for row in elem.find_all('tr'):
+                    row_content = [cell.get_text(strip=True) for cell in row.find_all(['th', 'td'])]
+                    table_content.append(' | '.join(row_content))
+                content.append('\n'.join(table_content))
+            # Handle links
+            elif elem.name == 'a':
+                link_text = elem.get_text(strip=True)
+                link_url = elem.get('href')
+                if link_text and link_url:
+                    content.append(f"[{link_text}]({link_url})")
             else:
                 text = elem.get_text(strip=True)
                 if text:
@@ -635,20 +653,27 @@ async def stream_response(prompt):
             full_response += content
             response_container.markdown(full_response)
 
+
+
+
+
+
+
 # Modify the streamlit_main function to include the search type option
 async def streamlit_main():
     st.set_page_config(page_title="AI Assistant Tools", page_icon="🛠️", layout="wide")
 
     st.title("AI Assistant Tools 🛠️")
-    st.markdown(f"""
-        This app provides various AI-powered tools for internal use. 
-        Choose a tool from the sidebar to get started.
-        """
-    )
-    
-    tool_choice = st.sidebar.radio("Choose a tool:", ("Job Description Generator", "Monthly Status Report Generator", "BD Response Assistant", "Prompt Generator", "Writing Assistant", "Text to Diagram Converter", "Search and Summarize"))
 
-    if tool_choice == "Prompt Generator":
+    tool_choice = st.sidebar.radio("Choose a tool:", ("Home", "Search and Summarize", "Job Description Generator", "Monthly Status Report Generator", "BD Response Assistant", "Prompt Generator", "Writing Assistant", "Text to Diagram Converter"))
+
+    if tool_choice == "Home":
+        st.markdown("""
+            This app provides various AI-powered tools for internal use. 
+            Choose a tool from the sidebar to get started.
+            """
+        )
+    elif tool_choice == "Prompt Generator":
         st.header("Prompt Generator 🧠")
         st.write("Generate and refine prompts for AI models.")
 
@@ -938,7 +963,7 @@ async def streamlit_main():
 
                 async def run_search():
                     nonlocal combined_content, full_response, word_count
-                    search_type_param = "fast" if search_type == "Fast (5 results)" else "deep"
+                    search_type_param = "fast" if search_type == "Fast (up to 5 sources)" else "deep"
                     websites_used, youtube_videos_used, combined_content, full_response, word_count = await search_and_summarize(query, model_choice, search_type_param, update_progress)
                     st.write(f"Search completed. Used {websites_used} websites and {youtube_videos_used} YouTube videos.")
                     st.write(f"Combined content word count: {word_count}")

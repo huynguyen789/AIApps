@@ -666,24 +666,33 @@ async def streamlit_main():
 
     st.title("AI Assistant Tools 🛠️")
 
-    tool_choice = st.sidebar.radio("Choose a tool:", ("Home", "Search and Summarize", "Job Description Generator", "Monthly Status Report Generator", "BD Response Assistant", "Prompt Generator", "Writing Assistant", "Text to Diagram Converter"))
+    tool_choice = st.sidebar.radio("Choose a tool:", (
+        "Home",
+        "Search Assistant",
+        "Job Description Assistant",
+        "Monthly Report Assistant",
+        "BD Response Assistant",
+        "Prompt Engineering Assistant",
+        "Writing Assistant",
+        "Diagram Creation Assistant"
+    ))
 
     if tool_choice == "Home":
         st.markdown("""
-            This app provides various AI-powered tools for internal use. 
-            Choose a tool from the sidebar to get started.
+            This app provides various AI-powered assistants for internal use. 
+            Choose an assistant from the sidebar to get started.
             """
         )
-    elif tool_choice == "Prompt Generator":
-        st.header("Prompt Generator 🧠")
+    elif tool_choice == "Prompt Engineering Assistant":
+        st.header("Prompt Engineering Assistant 🧠")
         st.write("Generate and refine prompts for AI models.")
 
         user_request = st.text_input("Enter your request for prompt generation:")
         if user_request:
             await prompt_generator(user_request)
             
-    elif tool_choice == "Job Description Generator":
-        st.header("Job Description Generator 📝")
+    elif tool_choice == "Job Description Assistant":
+        st.header("Job Description Assistant 📝")
         st.write("Enter the job title and any additional requirements to generate a high-quality job description.")
 
         if 'job_description' not in st.session_state:
@@ -831,8 +840,8 @@ async def streamlit_main():
                     feedback = await get_feedback(st.session_state.bd_document, st.session_state.bd_requirements)
                     st.markdown(feedback)
 
-    elif tool_choice == "Text to Diagram Converter":
-        st.header("Text to Diagram Converter 🎨")
+    elif tool_choice == "Diagram Creation Assistant":
+        st.header("Diagram Creation Assistant 🎨")
         st.write("Transform your ideas into visual diagrams with ease!")
         st.write("Here are some example descriptions you can use:")
         st.code("""
@@ -889,17 +898,16 @@ async def streamlit_main():
             st.session_state.diagram_description = ""
             st.session_state.mermaid_code = ""
             st.rerun()
-    elif tool_choice == "Monthly Status Report Generator":
-        st.header("Monthly Status Report Generator 📊")
+    elif tool_choice == "Monthly Report Assistant":
+        st.header("Monthly Report Assistant 📊")
         st.write("""
-        Welcome to the Monthly Status Report Generator! This tool simplifies the process of creating 
+        Welcome to the Monthly Report Assistant! This tool simplifies the process of creating 
         comprehensive monthly status reports by combining individual reports into a single, cohesive document. 
         Here's how it works:
         
         1. Upload your individual monthly status reports (Word or Text files)
         2. Generate a combined report with just one click
         3. Download the final report as a Word document
-        
         
         Get started by uploading your files below!
         """)
@@ -942,8 +950,8 @@ async def streamlit_main():
                 # Clean up temporary files
                 os.unlink(tmp_md.name)
                 os.unlink(tmp_docx.name)
-    elif tool_choice == "Search and Summarize":
-        st.header("AI-Powered Search and Summarize 🔍")
+    elif tool_choice == "Search Assistant":
+        st.header("AI-Powered Search Assistant 🔍")
         st.write("Enter a search query, and the AI will search multiple websites and YouTube videos, then provide a concise and detailed answer.")
 
         query = st.text_input("Enter your search query:")

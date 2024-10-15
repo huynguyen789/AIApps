@@ -17,6 +17,7 @@ from bs4 import BeautifulSoup
 from youtube_transcript_api import YouTubeTranscriptApi
 from requests.exceptions import Timeout
 from datetime import datetime
+
 # Initialize clients
 openai_client = AsyncOpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 anthropic_client = AsyncAnthropic(api_key=st.secrets["ANTHROPIC_API_KEY"])

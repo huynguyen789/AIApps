@@ -56,7 +56,6 @@ async def get_model_answer(instruction, prompt, model_name):
 def remove_analysis(prompt):
     return re.sub(r'<analysis>.*?</analysis>', '', prompt, flags=re.DOTALL)
 
-
 async def prompt_generator(user_request):
     optimizer_model = "claude-3-5-sonnet-20240620"  # or "gpt-4-0125-preview"
     
@@ -156,7 +155,7 @@ User Feedback:
     async for chunk in response:
         if chunk.choices[0].delta.content is not None:
             yield chunk.choices[0].delta.content
-#End Job description generator
+#########################################################
 
 
 #Writing tools
@@ -191,7 +190,7 @@ async def process_text(user_input, task):
             yield chunk.choices[0].delta.content
 
     # return processed_content
-#End Writing tools
+#########################################################
 
 #BD Response Assistant
 async def get_feedback(document, requirements):
@@ -213,7 +212,7 @@ async def get_feedback(document, requirements):
         ]
     )
     return response.choices[0].message.content
-#End BD Response Assistant
+#########################################################
 
 
 
@@ -284,7 +283,7 @@ def generate_mermaid_chart(mermaid_code, format='png'):
         return response.content
     else:
         return None    
-    
+######################################################### 
     
 
 # Monthly Status Report Generator
@@ -391,12 +390,11 @@ def save_markdown_to_file(markdown_content: str, file_path: str):
 
 def convert_markdown_to_docx(markdown_file_path: str, output_file_path: str):
     pypandoc.convert_file(markdown_file_path, 'docx', outputfile=output_file_path)
-#End Monthly Status Report Generator
 #########################################################
 
 
 
-# Add the new functions for the search and summarize tool
+#SEARCH TOOLS
 def clean_content(soup):
     # Remove unnecessary elements
     for element in soup(['script', 'style', 'nav', 'footer', 'header']):
@@ -452,7 +450,6 @@ def clean_content(soup):
         return cleaned_content
     else:
         return "No main content found."
-
 
 # Add this function to set up the Gemini model
 def setup_gemini_model():
@@ -653,7 +650,7 @@ async def stream_response(prompt):
             content = chunk.choices[0].delta.content
             full_response += content
             response_container.markdown(full_response)
-
+#########################################################
 
 
 
@@ -681,6 +678,10 @@ async def streamlit_main():
         st.markdown("""
             This app provides various AI-powered assistants for internal use. 
             Choose an assistant from the sidebar to get started.
+
+            **Please use responsibly:** avoid sharing sensitive or proprietary information, and your client policies should take priority. These tools are not approved for use with any classified or CUI/FOUO data and you should ask your manager before sharing any client data. If you have any questions about appropriate use please contact Matt Teschke.
+
+            **Note:** LLMs can make up information. You should treat responses as a starting point or draft and be sure to verify any information.
             """
         )
     elif tool_choice == "Prompt Engineering Assistant":

@@ -18,6 +18,7 @@ from youtube_transcript_api import YouTubeTranscriptApi
 from requests.exceptions import Timeout
 from datetime import datetime
 
+
 # Initialize clients
 openai_client = AsyncOpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 anthropic_client = AsyncAnthropic(api_key=st.secrets["ANTHROPIC_API_KEY"])
@@ -947,8 +948,6 @@ async def streamlit_main():
         Get started by uploading your files below!
         """)
         
-        st.warning("Note: This assistant cannot review figures and tables yet. Please ensure any critical information in figures or tables is also described in text.")
-
         uploaded_files = st.file_uploader("Upload input files (Word or Text)", type=['docx', 'txt'], accept_multiple_files=True)
 
         if uploaded_files:
@@ -1008,7 +1007,7 @@ async def streamlit_main():
 
         # Use session state for the input fields
         query = st.text_input("Enter your search query:", value=st.session_state.search_query, key="search_query_input")
-        model_choice = st.selectbox("Choose AI model:", ["gemini", "gpt4", "claude"], index=["gemini", "gpt4", "claude"].index(st.session_state.search_model_choice), key="search_model_choice")
+        model_choice = st.selectbox("Choose AI model(Optional):", ["gemini", "gpt4", "claude"], index=["gemini", "gpt4", "claude"].index(st.session_state.search_model_choice), key="search_model_choice")
         search_type = st.radio("Search Type:", ["Fast (up to 5 sources)", "Deep (up to 10 sources)"], index=["Fast (up to 5 sources)", "Deep (up to 10 sources)"].index(st.session_state.search_type), key="search_type")
 
         # Update session state only if the values have changed

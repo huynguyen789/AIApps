@@ -249,16 +249,27 @@ async def process_text(user_input, task):
 #########################################################
 
 #BD Response Assistant
-async def get_feedback(document, requirements):
+async def get_feedback(document, requirements, user_instructions):
     user_content = f"""
     <system_prompt>
     You are an expert in business development proposals for government with 30 years track record exceptional experience and of 95% winning rate proposal."
     </system_prompt>
     
-    Requirements Document:\n{requirements}\n\nUser's Draft:\n{document}\n\n
+    Requirements Document:\n{requirements}\n\n
+    User's Draft:\n{document}\n\n
+    User's Additional Instructions:\n{user_instructions}\n\n
     
     Provide detailed feedback on the user's draft generally and on the requirements provided. 
     Be critical, point out things that user dont see. The goal is a world-class winning proposal. 
+    Pay special attention to the user's additional instructions and focus areas if provided.
+    
+    If the user has specifically requested feedback on their technical approach, provide a detailed analysis of the approach, including:
+    1. Strengths of the current technical approach
+    2. Areas for improvement or expansion
+    3. Alignment with the requirements document
+    4. Suggestions for enhancing the technical content
+    5. Any potential innovative ideas that could set this proposal apart
+    
     MAKE SURE YOU DOING AN EXCEPTIONAL JOB, I WILL GIVE YOU $100,000 BONUS THIS YEAR, IF NOT A CAT WILL DIE."""
 
     response = await openai_client.chat.completions.create(
@@ -420,7 +431,17 @@ async def generate_monthly_status_report(model_name: str, master_content: str, e
 def read_file(file):
     if file.name.endswith('.docx'):
         doc = Document(file)
-        return '\n'.join([para.text for para in doc.paragraphs])
+        full_text = []
+        for element in doc.element.body:
+            if element.tag.endswith('p'):
+                full_text.append(element.text)
+            elif element.tag.endswith('tbl'):
+                table = []
+                for row in element.findall('.//w:tr', namespaces=element.nsmap):
+                    cells = [cell.text for cell in row.findall('.//w:t', namespaces=element.nsmap)]
+                    table.append(' | '.join(cells))
+                full_text.append('\n'.join(table))
+        return '\n'.join(full_text)
     elif file.name.endswith('.txt'):
         return file.getvalue().decode('utf-8')
     else:
@@ -817,6 +838,8 @@ async def streamlit_main():
             st.session_state.bd_document = ""
         if "bd_requirements" not in st.session_state:
             st.session_state.bd_requirements = ""
+        if "bd_user_instructions" not in st.session_state:
+            st.session_state.bd_user_instructions = ""
 
         # File upload option for BD response draft
         bd_file = st.file_uploader("Upload your BD Response Draft (Word or Text file)", type=['docx', 'txt'])
@@ -836,12 +859,20 @@ async def streamlit_main():
                                                             value=st.session_state.bd_requirements, 
                                                             height=100)  
 
+        # New section for user instructions or comments
+        st.session_state.bd_user_instructions = st.text_area(
+            "Additional Instructions or Focus Areas (optional):",
+            value=st.session_state.bd_user_instructions,
+            height=100,
+            help="Provide any specific areas you want feedback on, or any particular aspects of the technical approach you'd like the AI to focus on. For example: 'I'm working on an early draft and want feedback on my technical approach.'"
+        )
+
         if st.button("Get Feedback"):
             if st.session_state.bd_document.strip() == "" or st.session_state.bd_requirements.strip() == "":
                 st.warning("Please provide both the BD response draft and the requirements document.")
             else:
                 with st.spinner("Generating feedback..."):
-                    feedback = await get_feedback(st.session_state.bd_document, st.session_state.bd_requirements)
+                    feedback = await get_feedback(st.session_state.bd_document, st.session_state.bd_requirements, st.session_state.bd_user_instructions)
                     st.markdown(feedback)
 
     elif tool_choice == "Diagram Creation Assistant":

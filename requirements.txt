@@ -129,4 +129,4 @@ wcwidth==0.2.13
 webencodings==0.5.1
 yarl==1.9.4
 youtube-transcript-api==0.6.2
-git+https://github.com/jankatins/pypandoc-wheels.git
+

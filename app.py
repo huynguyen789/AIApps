@@ -113,25 +113,20 @@ async def prompt_generator(user_request):
 
 
 
-#Job description generator:
-async def generate_job_description(job_title, additional_requirements):
+async def generate_job_description(job_title, additional_requirements, is_pws):
     main_prompt = load_prompt('job_description.txt')
     
-    user_input = f"Job title: {job_title}. {additional_requirements}"
+    pws_instruction = "This is a PWS workflow. Follow the languages/wordings in the requirements strictly!!." if is_pws else ""
+    formatted_prompt = f"Job title: {job_title}. {additional_requirements} {pws_instruction} \n\n {main_prompt}"
     
-    response = await openai_client.chat.completions.create(
-        model="gpt-4o",  # Changed from "gpt-4o" to "gpt-4"
-        messages=[
-            {"role": "system", "content": main_prompt},
-            {"role": "user", "content": user_input}
-        ],
-        stream=True,
-    )
+    model = setup_gemini_model()
+    response = model.generate_content(formatted_prompt, stream=True)
+    for chunk in response:
+        if chunk.text:
+            # Replace '\n' with two spaces and a newline for Markdown line breaks
+            formatted_text = chunk.text.replace('\n', '  \n')
+            yield formatted_text
 
-    async for chunk in response:
-        if chunk.choices[0].delta.content is not None:
-            yield chunk.choices[0].delta.content
-    
 async def improve_job_description(original_jd, feedback, job_title, additional_requirements):
     improve_prompt = load_prompt('improve_job_description.txt')
     improve_input = f"""
@@ -283,7 +278,7 @@ def generate_mermaid_chart(mermaid_code, format='png'):
         return response.content
     else:
         return None    
-######################################################### 
+#########################################################
     
 
 # Monthly Status Report Generator
@@ -470,7 +465,7 @@ def setup_gemini_model():
     ]
     
     return genai.GenerativeModel(
-        model_name="gemini-1.5-flash",
+        model_name="gemini-1.5-pro-002",
         generation_config=generation_config,
         safety_settings=safety_settings
     )
@@ -657,7 +652,7 @@ async def stream_response(prompt):
 
 
 
-# Modify the streamlit_main function to include the search type option
+#MAIN APP
 async def streamlit_main():
     st.set_page_config(page_title="AI Assistant Tools", page_icon="🛠️", layout="wide")
 
@@ -702,6 +697,8 @@ async def streamlit_main():
             st.session_state.job_title = ""
         if 'additional_requirements' not in st.session_state:
             st.session_state.additional_requirements = ""
+        if 'is_pws' not in st.session_state:
+            st.session_state.is_pws = False
 
         job_title = st.text_input("Enter the job title:", 
                                   value=st.session_state.job_title, 
@@ -715,18 +712,19 @@ async def streamlit_main():
         
         additional_requirements = st.text_area("Enter any additional requirements (optional):", 
                                                value=st.session_state.additional_requirements,
-                                               placeholder="You can paste the PWS requirements here OR manually type: TS clearance, 5+ years of experience in Python, knowledge of machine learning, etc.",
+                                               placeholder="TS clearance, 5+ years of experience in Python, knowledge of machine learning, etc.",
                                                key="job_description_requirements")
-        st.info("Note: If you want the tool to strictly follow the requirements, include 'PWS' in the additional requirements box.")
 
-
+        # Add PWS checkbox
+        is_pws = st.checkbox("This is a PWS (model will follow PWS language strictly)", value=st.session_state.is_pws, key="is_pws_checkbox")
+        st.session_state.is_pws = is_pws
 
         if st.button("Generate Job Description"):
             if job_title:
                 with st.spinner("Generating job description..."):
                     job_description_placeholder = st.empty()
                     full_content = ""
-                    async for content in generate_job_description(job_title, additional_requirements):
+                    async for content in generate_job_description(job_title, additional_requirements, is_pws):
                         full_content += content
                         job_description_placeholder.markdown(full_content)
                     st.session_state.job_description = full_content
@@ -740,7 +738,7 @@ async def streamlit_main():
         #     st.markdown("### Current Job Description")
         #     st.markdown(st.session_state.job_description)
                 
-        feedback = st.text_area("Provide feedback to improve the job description:", placeholder="example: tailor for CBM+ projects, 7 years of experience instead of 5, etc...")
+        feedback = st.text_area("Provide feedback to improve the job description:", placeholder="example: Follow exactly the PWS languages, tailor for CBM+ projects, 7 years of experience instead of 5, etc...")
         
         if st.button("Improve Job Description"):
             if feedback and st.session_state.job_description:
@@ -808,6 +806,8 @@ async def streamlit_main():
         st.header("BD Response Assistant 📄")
         
         st.write("Welcome! We're here to help you refine your BD response. You can either paste your draft and requirements or upload files.")
+        
+        st.warning("Note: This assistant cannot review figures and tables yet. Please ensure any critical information in figures or tables is also described in text.")
 
         # Initialize session state variables
         if "bd_document" not in st.session_state:
@@ -822,7 +822,7 @@ async def streamlit_main():
         else:
             st.session_state.bd_document = st.text_area("Or paste your BD Response Draft here:", 
                                                         value=st.session_state.bd_document, 
-                                                        height=300)
+                                                        height=100)  
 
         # File upload option for requirements document
         req_file = st.file_uploader("Upload the Requirements Document (Word or Text file)", type=['docx', 'txt'])
@@ -831,7 +831,7 @@ async def streamlit_main():
         else:
             st.session_state.bd_requirements = st.text_area("Or paste the Requirements Document here:", 
                                                             value=st.session_state.bd_requirements, 
-                                                            height=300)
+                                                            height=100)  
 
         if st.button("Get Feedback"):
             if st.session_state.bd_document.strip() == "" or st.session_state.bd_requirements.strip() == "":
@@ -912,6 +912,8 @@ async def streamlit_main():
         
         Get started by uploading your files below!
         """)
+        
+        st.warning("Note: This assistant cannot review figures and tables yet. Please ensure any critical information in figures or tables is also described in text.")
 
         uploaded_files = st.file_uploader("Upload input files (Word or Text)", type=['docx', 'txt'], accept_multiple_files=True)
 

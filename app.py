@@ -17,6 +17,12 @@ from bs4 import BeautifulSoup
 from youtube_transcript_api import YouTubeTranscriptApi
 from requests.exceptions import Timeout
 from datetime import datetime
+import io
+from docx import Document
+from docx.shared import Pt
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.enum.style import WD_STYLE_TYPE
+from docx.shared import Inches
 
 
 # Initialize clients
@@ -385,6 +391,75 @@ def setup_ai_model(model_name: str):
     else:
         raise ValueError(f"Unsupported model: {model_name}")
 
+def create_word_document(markdown_content):
+    doc = Document()
+    
+    # Set up styles
+    styles = doc.styles
+    
+    title_style = styles['Title'] if 'Title' in styles else styles.add_style('Title', WD_STYLE_TYPE.PARAGRAPH)
+    title_style.font.size = Pt(16)
+    title_style.font.bold = True
+    
+    heading1_style = styles['Heading 1'] if 'Heading 1' in styles else styles.add_style('Heading 1', WD_STYLE_TYPE.PARAGRAPH)
+    heading1_style.font.size = Pt(14)
+    heading1_style.font.bold = True
+    
+    heading2_style = styles['Heading 2'] if 'Heading 2' in styles else styles.add_style('Heading 2', WD_STYLE_TYPE.PARAGRAPH)
+    heading2_style.font.size = Pt(12)
+    heading2_style.font.bold = True
+    
+    normal_style = styles['Normal']
+    normal_style.font.size = Pt(11)
+    
+    # Process the Markdown content
+    lines = markdown_content.split('\n')
+    current_list = None
+    for line in lines:
+        if not line.strip():
+            current_list = None
+            if 'current_table' in locals():
+                del current_table
+            doc.add_paragraph()
+            continue
+        
+        if line.startswith('# '):
+            p = doc.add_paragraph(line[2:], style='Title')
+            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        elif line.startswith('## '):
+            doc.add_paragraph(line[3:], style='Heading 1')
+        elif line.startswith('### '):
+            doc.add_paragraph(line[4:], style='Heading 2')
+        elif line.startswith('#### '):
+            p = doc.add_paragraph(line[5:], style='Heading 2')
+            p.runs[0].italic = True
+        elif line.startswith('- '):
+            if current_list is None:
+                current_list = doc.add_paragraph(style='List Bullet')
+            current_list.add_run(line[2:])
+            current_list.add_run('\n')
+        elif line.startswith('|'):
+            if 'current_table' not in locals():
+                row_data = [cell.strip() for cell in line.split('|') if cell.strip()]
+                current_table = doc.add_table(rows=1, cols=len(row_data))
+                current_table.style = 'Table Grid'
+                hdr_cells = current_table.rows[0].cells
+                for i, val in enumerate(row_data):
+                    hdr_cells[i].text = val
+            else:
+                row_data = [cell.strip() for cell in line.split('|') if cell.strip()]
+                row_cells = current_table.add_row().cells
+                for i, val in enumerate(row_data):
+                    row_cells[i].text = val
+        else:
+            doc.add_paragraph(line)
+    
+    # Set consistent paragraph spacing
+    for paragraph in doc.paragraphs:
+        paragraph.paragraph_format.space_after = Pt(8)
+    
+    return doc
+
 async def generate_monthly_status_report(model_name: str, master_content: str, example_content: str):
     prompt = load_prompt("monthly_status_report.txt")
     formatted_prompt = prompt.format(
@@ -395,10 +470,12 @@ async def generate_monthly_status_report(model_name: str, master_content: str, e
     model = setup_ai_model(model_name)
     
     try:
+        full_response = ""
         if model_name == "gemini":
             response = model.generate_content(formatted_prompt, stream=True)
             for chunk in response:
                 if chunk.text:
+                    full_response += chunk.text
                     yield chunk.text
         elif model_name == "claude":
             async with anthropic.AsyncClient(api_key=st.secrets["ANTHROPIC_API_KEY"]) as aclient:
@@ -414,10 +491,11 @@ async def generate_monthly_status_report(model_name: str, master_content: str, e
                     ]
                 ) as stream:
                     async for text in stream.text_stream:
+                        full_response += text
                         yield text
         elif model_name == "gpt4":
             stream = await openai_client.chat.completions.create(
-                model="gpt-4o",
+                model="gpt-4o-mini",
                 messages=[{"role": "user", "content": formatted_prompt}],
                 max_tokens=4096,
                 temperature=0,
@@ -425,7 +503,11 @@ async def generate_monthly_status_report(model_name: str, master_content: str, e
             )
             async for chunk in stream:
                 if chunk.choices[0].delta.content is not None:
+                    full_response += chunk.choices[0].delta.content
                     yield chunk.choices[0].delta.content
+        
+        # After all chunks have been yielded, yield the full response
+        yield full_response
     except Exception as e:
         yield f"An error occurred: {e}"
 
@@ -465,6 +547,11 @@ def process_input_files(files):
 def save_markdown_to_file(markdown_content: str, file_path: str):
     with open(file_path, 'w') as md_file:
         md_file.write(markdown_content)
+
+def create_docx_from_markdown(markdown_content):
+    doc = Document()
+    doc.add_paragraph(markdown_content)
+    return doc
 
 def convert_markdown_to_docx(markdown_file_path: str, output_file_path: str):
     pypandoc.convert_file(markdown_file_path, 'docx', outputfile=output_file_path)
@@ -671,6 +758,7 @@ async def stream_response(prompt):
             full_response += content
             response_container.markdown(full_response)
 #########################################################
+
 
 
 
@@ -939,53 +1027,69 @@ async def streamlit_main():
         st.write("""
         Welcome to the Monthly Report Assistant! This tool simplifies the process of creating 
         comprehensive monthly status reports by combining individual reports into a single, cohesive document. 
-        Here's how it works:
-        
-        1. Upload your individual monthly status reports (Word or Text files)
-        2. Generate a combined report with just one click
-        3. Download the final report as a Word document
-        
         Get started by uploading your files below!
         """)
         
+        # Initialize session state variables
+        if 'report_content' not in st.session_state:
+            st.session_state.report_content = ""
+        if 'master_content' not in st.session_state:
+            st.session_state.master_content = ""
+        if 'files_processed' not in st.session_state:
+            st.session_state.files_processed = False
+
         uploaded_files = st.file_uploader("Upload input files (Word or Text)", type=['docx', 'txt'], accept_multiple_files=True)
 
-        if uploaded_files:
-            master_content = process_input_files(uploaded_files)
+        if uploaded_files and not st.session_state.files_processed:
+            st.session_state.master_content = process_input_files(uploaded_files)
+            st.session_state.files_processed = True
+
+        if st.session_state.files_processed:
             with open("./example/example.txt", 'r') as file:
                 example_content = file.read()
 
-            model_choice = st.selectbox("Choose AI model(optional):", ["gemini", "gpt4", "claude"])
-            st.info("We recommend using the Gemini model for optimal performance.")
+            model_choice = st.selectbox("Choose AI model:", ["gemini", "gpt4", "claude"])
 
-            if st.button("Generate Report"):
-                report_placeholder = st.empty()
-                report_content = ""
-                
-                async for chunk in generate_monthly_status_report(model_choice, master_content, example_content):
-                    report_content += chunk
-                    report_placeholder.markdown(report_content + "▌")
-                
-                report_placeholder.markdown(report_content)
+            if st.button("Generate Report") or st.session_state.report_content:
+                if not st.session_state.report_content:
+                    report_placeholder = st.empty()
+                    report_content = ""
+                    
+                    async for chunk in generate_monthly_status_report(model_choice, st.session_state.master_content, example_content):
+                        if chunk == report_content:  # This is the full response
+                            st.session_state.report_content = chunk
+                        else:
+                            report_content += chunk
+                            report_placeholder.markdown(report_content + "▌")
 
-                # Save the report as Word
-                with tempfile.NamedTemporaryFile(delete=False, suffix='.md') as tmp_md:
-                    save_markdown_to_file(report_content, tmp_md.name)
-                
-                with tempfile.NamedTemporaryFile(delete=False, suffix='.docx') as tmp_docx:
-                    convert_markdown_to_docx(tmp_md.name, tmp_docx.name)
-                
-                # Provide download link for Word report
-                st.download_button(
-                    label="Download Word Report",
-                    data=open(tmp_docx.name, 'rb').read(),
-                    file_name="monthly_status_report.docx",
-                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                )
+            # Create Word document
+            doc = create_word_document(st.session_state.report_content)
+            
+            # Save DOCX to BytesIO object
+            docx_bio = io.BytesIO()
+            doc.save(docx_bio)
+            docx_bio.seek(0)
 
-                # Clean up temporary files
-                os.unlink(tmp_md.name)
-                os.unlink(tmp_docx.name)
+            # Provide download button for Word Report
+            st.download_button(
+                label="Download Word Report",
+                data=docx_bio.getvalue(),
+                file_name="monthly_status_report.docx",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            )
+                
+            if st.button("Reset"):
+                st.session_state.report_content = ""
+                st.session_state.master_content = ""
+                st.session_state.files_processed = False
+                st.rerun()
+                
+            #clear the streaming output before display the report
+            st.empty()
+            with st.expander("### Generated Report"):
+                st.markdown(st.session_state.report_content)
+
+
     elif tool_choice == "Search Assistant":
         st.header("AI-Powered Search Assistant 🔍")
         st.write("Enter a search query, and the AI will search multiple websites and YouTube videos, then provide a concise and detailed answer.")

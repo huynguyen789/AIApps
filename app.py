@@ -22,10 +22,70 @@ from datetime import datetime
 openai_client = AsyncOpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 anthropic_client = AsyncAnthropic(api_key=st.secrets["ANTHROPIC_API_KEY"])
 
+# UTILITIES
+def setup_model(model_name: str):
+    if model_name == "gemini":
+        api_key = st.secrets["GOOGLE_API_KEY"]
+        genai.configure(api_key=api_key)
+        
+        generation_config = {
+            "temperature": 0,
+            "max_output_tokens": 8192,
+        }
+        
+        safety_settings = [
+            {"category": "HARM_CATEGORY_DANGEROUS", "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+            {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+        ]
+        
+        return genai.GenerativeModel(
+            model_name="gemini-1.5-pro-002",
+            generation_config=generation_config,
+            safety_settings=safety_settings
+        )
+    elif model_name == "claude":
+        return AsyncAnthropic(api_key=st.secrets["ANTHROPIC_API_KEY"])
+    elif model_name == "gpt4":
+        return AsyncOpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+    else:
+        raise ValueError(f"Unsupported model: {model_name}")
+
+async def generate_response(model, prompt):
+    if isinstance(model, genai.GenerativeModel):  # Gemini
+        response = model.generate_content(prompt, stream=True)
+        for chunk in response:
+            if chunk.text:
+                yield chunk.text
+    elif isinstance(model, AsyncAnthropic):  # Claude
+        async with model.messages.stream(
+            model="claude-3-5-sonnet-20240620",
+            max_tokens=4096,
+            temperature=0,
+            messages=[{"role": "user", "content": prompt}]
+        ) as stream:
+            async for text in stream.text_stream:
+                yield text
+    elif isinstance(model, AsyncOpenAI):  # GPT-4
+        stream = await model.chat.completions.create(
+            model="gpt-4o",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=4096,
+            temperature=0,
+            stream=True
+        )
+        async for chunk in stream:
+            if chunk.choices[0].delta.content is not None:
+                yield chunk.choices[0].delta.content
+
 def load_prompt(filename):
     with open(os.path.join('./prompts', filename), 'r') as file:
         return file.read()
+#########################################################
 
+#Prompt generation
 async def get_model_answer(instruction, prompt, model_name):
     if "claude" in model_name.lower():
         message = await anthropic_client.messages.create(
@@ -110,6 +170,7 @@ async def prompt_generator(user_request):
         st.rerun()
     
     return st.session_state.current_prompt
+#########################################################
 
 
 
@@ -119,7 +180,7 @@ async def generate_job_description(job_title, additional_requirements, is_pws):
     pws_instruction = "This is a PWS workflow. Follow the languages/wordings in the requirements strictly!!." if is_pws else ""
     formatted_prompt = f"Job title: {job_title}. {additional_requirements} {pws_instruction} \n\n {main_prompt}"
     
-    model = setup_gemini_model()
+    model = setup_model("gemini")
     response = model.generate_content(formatted_prompt, stream=True)
     for chunk in response:
         if chunk.text:
@@ -446,29 +507,6 @@ def clean_content(soup):
     else:
         return "No main content found."
 
-# Add this function to set up the Gemini model
-def setup_gemini_model():
-    api_key = st.secrets["GOOGLE_API_KEY"]
-    genai.configure(api_key=api_key)
-    
-    generation_config = {
-        "temperature": 0,
-        "max_output_tokens": 8192,
-    }
-    
-    safety_settings = [
-        {"category": "HARM_CATEGORY_DANGEROUS", "threshold": "BLOCK_NONE"},
-        {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
-        {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
-        {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
-        {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
-    ]
-    
-    return genai.GenerativeModel(
-        model_name="gemini-1.5-pro-002",
-        generation_config=generation_config,
-        safety_settings=safety_settings
-    )
 
 async def search_and_summarize(query, model_choice, search_type, progress_callback=None):
     if progress_callback:
@@ -581,47 +619,12 @@ async def search_and_summarize(query, model_choice, search_type, progress_callba
     )
     
     # Use the selected model for generating the response
-    if model_choice == "gemini":
-        model = setup_gemini_model()
-        response = model.generate_content(formatted_prompt, stream=True)
-        response_container = st.empty()
-        full_response = ""
-        for chunk in response:
-            if chunk.text:
-                full_response += chunk.text
-                response_container.markdown(full_response)
-    elif model_choice == "claude":
-        async with anthropic.AsyncClient(api_key=st.secrets["ANTHROPIC_API_KEY"]) as aclient:
-            async with aclient.messages.stream(
-                model="claude-3-5-sonnet-20240620",
-                max_tokens=4096,
-                temperature=0,
-                messages=[
-                    {
-                        "role": "user",
-                        "content": formatted_prompt
-                    }
-                ]
-            ) as stream:
-                response_container = st.empty()
-                full_response = ""
-                async for text in stream.text_stream:
-                    full_response += text
-                    response_container.markdown(full_response)
-    elif model_choice == "gpt4":
-        stream = await openai_client.chat.completions.create(
-            model="gpt-4o",
-            messages=[{"role": "user", "content": formatted_prompt}],
-            max_tokens=4096,
-            temperature=0,
-            stream=True
-        )
-        response_container = st.empty()
-        full_response = ""
-        async for chunk in stream:
-            if chunk.choices[0].delta.content is not None:
-                full_response += chunk.choices[0].delta.content
-                response_container.markdown(full_response)
+    model = setup_model(model_choice)
+    response_container = st.empty()
+    full_response = ""
+    async for content in generate_response(model, formatted_prompt):
+        full_response += content
+        response_container.markdown(full_response)
 
     if progress_callback:
         await progress_callback("Search and summarize process completed", 1.0)

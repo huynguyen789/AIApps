@@ -29,7 +29,7 @@ Carefully think based on the user query and content to generate a world-class an
     Always cite sources with the link in the answer. Which part come from which source as hyperlink.
     Output nicely in Markdown with clear tittles and contents. 
     *** Important: For coding search:
-    - If you found many different answers, code syntax, or approaches, show them all to user. User can test out to see which one works(note to them that too)
+    - If you found many different answers, code syntax, or approaches, alert & show them all to user. User can test out to see which one works(note to them that too)
     - Pay more attention to date on the content for the newest code version and show the user that info too.
     - Example: If you found 2 results: 
             Old and wrong way:
@@ -54,7 +54,7 @@ Carefully think based on the user query and content to generate a world-class an
 
             print(completion.choices[0].message.content)
 
-            Show the user both examples so they can select from! 
+            Alert & show the user both examples so they can select from! 
 
 If you done a great job, you will get a 100k bonus this year. If not a cat will die.
 </instruction>

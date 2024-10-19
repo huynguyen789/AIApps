@@ -49,7 +49,7 @@ def setup_model(model_name: str):
         ]
         
         return genai.GenerativeModel(
-            model_name="gemini-1.5-pro-002",
+            model_name="gemini-1.5-flash-002",
             generation_config=generation_config,
             safety_settings=safety_settings
         )

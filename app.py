@@ -1089,7 +1089,6 @@ async def streamlit_main():
             with st.expander("### Generated Report"):
                 st.markdown(st.session_state.report_content)
 
-
     elif tool_choice == "Search Assistant":
         st.header("AI-Powered Search Assistant 🔍")
         st.write("Enter a search query, and the AI will search multiple websites and YouTube videos, then provide a concise and detailed answer.")
@@ -1108,52 +1107,73 @@ async def streamlit_main():
             st.session_state.search_model_choice = "gemini"
         if 'search_type' not in st.session_state:
             st.session_state.search_type = "Fast (up to 5 sources)"
+        if 'search_results' not in st.session_state:
+            st.session_state.search_results = None
 
         # Use session state for the input fields
-        query = st.text_input("Enter your search query:", value=st.session_state.search_query, key="search_query_input")
-        model_choice = st.selectbox("Choose AI model(Optional):", ["gemini", "gpt4", "claude"], index=["gemini", "gpt4", "claude"].index(st.session_state.search_model_choice), key="search_model_choice")
-        search_type = st.radio("Search Type:", ["Fast (up to 5 sources)", "Deep (up to 10 sources)"], index=["Fast (up to 5 sources)", "Deep (up to 10 sources)"].index(st.session_state.search_type), key="search_type")
+        query = st.text_input("Enter your search query:", key="search_query_input")
+        model_choice = st.selectbox("Choose AI model (Optional):", ["gemini", "gpt4", "claude"], key="search_model_choice")
+        search_type = st.radio("Search Type:", ["Fast (up to 5 sources)", "Deep (up to 10 sources)"], key="search_type")
 
-        # Update session state only if the values have changed
-        if query != st.session_state.search_query:
-            st.session_state.search_query = query
-        if model_choice != st.session_state.search_model_choice:
-            st.session_state.search_model_choice = model_choice
-        if search_type != st.session_state.search_type:
-            st.session_state.search_type = search_type
+        async def run_search():
+            search_type_param = "fast" if st.session_state.search_type == "Fast (up to 5 sources)" else "deep"
+            current_date = datetime.now().strftime("%Y-%m-%d")
+            query_with_date = f"{st.session_state.search_query} - {current_date}"
+            
+            websites_used, youtube_videos_used, combined_content, full_response, word_count = await search_and_summarize(
+                query_with_date, 
+                st.session_state.search_model_choice, 
+                search_type_param, 
+                update_progress
+            )
+            
+            st.session_state.search_results = {
+                "websites_used": websites_used,
+                "youtube_videos_used": youtube_videos_used,
+                "combined_content": combined_content,
+                "full_response": full_response,
+                "word_count": word_count
+            }
 
         if st.button("Search and Summarize"):
             if query:
-                # Add current date to the query
-                current_date = datetime.now().strftime("%Y-%m-%d")
-                query_with_date = f"{query} - {current_date}"
-                # st.write(f"Searching for: {query_with_date}")
+                # Update session state
+                st.session_state.search_query = query
 
                 status_text = st.empty()
                 progress_bar = st.progress(0)
-                combined_content = ""
-                full_response = ""
-                word_count = 0
 
                 async def update_progress(message, progress):
                     status_text.text(message)
                     progress_bar.progress(progress)
 
-                async def run_search():
-                    nonlocal combined_content, full_response, word_count
-                    search_type_param = "fast" if search_type == "Fast (up to 5 sources)" else "deep"
-                    websites_used, youtube_videos_used, combined_content, full_response, word_count = await search_and_summarize(query_with_date, model_choice, search_type_param, update_progress)
-                    st.write(f"Search completed. Used {websites_used} websites and {youtube_videos_used} YouTube videos.")
-                    st.write(f"Combined content word count: {word_count}")
+                # Create and run the task
+                search_task = asyncio.create_task(run_search())
+                
+                # Wait for the task to complete
+                st.spinner("Searching and summarizing...")
+                await search_task
 
-                await run_search()
+                # Rerun the app to display results
+                st.rerun()
 
-                # Show combined content in an expandable box
-                with st.expander("Show Combined Content"):
-                    st.text_area("Combined Content", value=combined_content, height=300)
+        # Display results if available
+        if st.session_state.search_results:
+            st.write(f"Search completed. Used {st.session_state.search_results['websites_used']} websites and {st.session_state.search_results['youtube_videos_used']} YouTube videos.")
+            st.write(f"Combined content word count: {st.session_state.search_results['word_count']}")
 
-            else:
-                st.warning("Please enter a search query.")
+            # Show combined content in an expandable box
+            with st.expander("Show Combined Content"):
+                st.text_area("Combined Content", value=st.session_state.search_results['combined_content'], height=300)
+
+            # Display the full response
+            st.subheader("Search Results:")
+            st.markdown(st.session_state.search_results['full_response'])
+
+        elif query:
+            st.warning("Please click 'Search and Summarize' to start the search.")
+        else:
+            st.warning("Please enter a search query.")
 
 
 if __name__ == "__main__":

@@ -1174,7 +1174,7 @@ async def streamlit_main():
         "Prompt Engineering Assistant",
         "Writing Assistant",
         "Diagram Creation Assistant",
-        "RAG Assistant"
+        "Document Chat Assistant"
     ))
 
     if tool_choice == "Home":
@@ -1570,7 +1570,7 @@ async def streamlit_main():
         else:
             st.warning("Please enter a search query.")
 
-    elif tool_choice == "RAG Assistant":
+    elif tool_choice == "Document Chat Assistant":
         st.header("Document Chat Assistant 📚")
         
         st.write("""

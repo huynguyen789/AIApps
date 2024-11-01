@@ -1165,24 +1165,47 @@ async def streamlit_main():
 
     st.title("AI Assistant Tools 🛠️")
 
-    tool_choice = st.sidebar.radio("Choose a tool:", (
+    # Create categories in the sidebar
+    st.sidebar.header("Categories")
+    category = st.sidebar.radio("Select Category:", [
         "Home",
-        "Search Assistant",
-        "Job Description Assistant",
-        "Monthly Report Assistant",
-        "BD Response Assistant",
-        "Prompt Engineering Assistant",
-        "Writing Assistant",
-        "Diagram Creation Assistant",
-        "Document Chat Assistant"
-    ))
+        "Business Development",
+        "Everyday Use"
+    ])
+
+    # Organize tools by category
+    if category == "Business Development":
+        tool_choice = st.sidebar.radio("Choose a tool:", [
+            "BD Response Assistant",
+            "Job Description Assistant",
+            "Monthly Report Assistant",
+            "Document Chat Assistant"
+        ])
+    elif category == "Everyday Use":
+        tool_choice = st.sidebar.radio("Choose a tool:", [
+            "Writing Assistant",
+            "Search Assistant",
+            "Diagram Creation Assistant",
+            "Prompt Engineering Assistant"
+        ])
+    else:  # Home
+        tool_choice = "Home"
 
     if tool_choice == "Home":
         st.markdown("""
             This app provides various AI-powered assistants for internal use. 
             Choose an assistant from the sidebar to get started.
 
-            **Please use responsibly:** avoid sharing sensitive or proprietary information, and your client policies should take priority. These tools are not approved for use with any classified or CUI/FOUO data and you should ask your manager before sharing any client data. If you have any questions about appropriate use please contact Matt Teschke.
+            **Privacy Notice:**
+            - OpenAI will not look at conversations* and deletes data after 30 days
+            - Chat histories are temporary and will be cleared when you close or refresh the page
+
+            **Usage Guidelines:**
+            - Not approved for use with CUI/FOUO or classified data
+            - Don't send personal info: email, phone number, DOB, address
+            - Don't use in hiring decisions (e.g. matching resumes to jobs)
+            - Each client has their own AI policies, so talk to your manager to discuss appropriate client use cases
+            - Use common sense and reach out if you have questions
 
             **Note:** LLMs can make up information. You should treat responses as a starting point or draft and be sure to verify any information.
             """
@@ -1664,7 +1687,7 @@ async def streamlit_main():
                 for chunk in process_query(query, retriever, k, st.session_state.rag_conversation_history, filename=display_filename, verbose=verbose):
                     full_response += chunk
                     message_placeholder.markdown(full_response + "▌")
-                message_placeholder.markdown(full_response)
+                # message_placeholder.markdown(full_response)
             
             # Add new message to history and trim if needed
             st.session_state.rag_conversation_history.append((query, full_response))

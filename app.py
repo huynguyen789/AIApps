@@ -780,10 +780,8 @@ async def stream_response(prompt):
 
 
 #RAG TOOL:
-
 # Load environment variables
 load_dotenv()
-
 openai_api_key = st.secrets["OPENAI_API_KEY"]
 client = OpenAI(api_key=openai_api_key)
 
@@ -1629,7 +1627,8 @@ async def streamlit_main():
 
         # Initialize session states for RAG specifically
         if 'rag_selected_folder' not in st.session_state:
-            st.session_state.rag_selected_folder = folder_options[0]
+            default_file = "2025-redhorse holiday schedule_3886900744985613677_combined_content.json"
+            st.session_state.rag_selected_folder = default_file if default_file in folder_options else folder_options[0]
         if 'rag_conversation_history' not in st.session_state:
             st.session_state.rag_conversation_history = []
 

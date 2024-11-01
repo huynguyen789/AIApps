@@ -87,7 +87,7 @@ async def generate_response(model, prompt):
                 yield chunk.text
     elif isinstance(model, AsyncAnthropic):  # Claude
         async with model.messages.stream(
-            model="claude-3-5-sonnet-20240620",
+            model="claude-3-5-sonnet-20241022",
             max_tokens=4096,
             temperature=0,
             messages=[{"role": "user", "content": prompt}]
@@ -143,7 +143,7 @@ def remove_analysis(prompt):
     return re.sub(r'<analysis>.*?</analysis>', '', prompt, flags=re.DOTALL)
 
 async def prompt_generator(user_request):
-    optimizer_model = "claude-3-5-sonnet-20240620"  # or "gpt-4-0125-preview"
+    optimizer_model = "claude-3-5-sonnet-20241022"  # or "gpt-4-0125-preview"
     
     if 'current_prompt' not in st.session_state:
         st.session_state.current_prompt = None
@@ -332,7 +332,7 @@ async def generate_mermaid_diagram(description):
     user_input = f"Create a Mermaid diagram for: {description}"
     
     response = await anthropic_client.messages.create(
-        model="claude-3-5-sonnet-20240620",
+        model="claude-3-5-sonnet-20241022",
         max_tokens=3000,
         temperature=0,
         system=prompt,
@@ -500,7 +500,7 @@ async def generate_monthly_status_report(model_name: str, master_content: str, e
         elif model_name == "claude":
             async with anthropic.AsyncClient(api_key=st.secrets["ANTHROPIC_API_KEY"]) as aclient:
                 async with aclient.messages.stream(
-                    model="claude-3-5-sonnet-20240620",
+                    model="claude-3-5-sonnet-20241022",
                     max_tokens=4096,
                     temperature=0,
                     messages=[
@@ -1183,8 +1183,8 @@ async def streamlit_main():
         ])
     elif category == "Everyday Use":
         tool_choice = st.sidebar.radio("Choose a tool:", [
-            "Writing Assistant",
             "Search Assistant",
+            "Writing Assistant",
             "Diagram Creation Assistant",
             "Prompt Engineering Assistant"
         ])

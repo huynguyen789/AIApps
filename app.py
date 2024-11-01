@@ -1177,21 +1177,33 @@ async def streamlit_main():
 
     if tool_choice == "Home":
         st.markdown("""
-            This app provides various AI-powered assistants for internal use. 
+            # AI Assistant Hub
+            
+            Welcome! This app provides various AI-powered assistants for internal use. 
             Choose an assistant from the sidebar to get started.
 
-            **Privacy Notice:**
+            ## Privacy Notice
             - OpenAI will not look at conversations* and deletes data after 30 days
             - Chat histories are temporary and will be cleared when you close or refresh the page
 
-            **Usage Guidelines:**
+            ## Usage Guidelines
             - Not approved for use with CUI/FOUO or classified data
             - Don't send personal info: email, phone number, DOB, address
             - Don't use in hiring decisions (e.g. matching resumes to jobs)
             - Each client has their own AI policies, so talk to your manager to discuss appropriate client use cases
             - Use common sense and reach out if you have questions
 
-            **Note:** LLMs can make up information. You should treat responses as a starting point or draft and be sure to verify any information.
+            ## Important Note
+            ⚠️ LLMs can make up information. You should treat responses as a starting point or draft and be sure to verify any information.
+
+            ## Feedback & Suggestions
+            We're constantly improving! Please reach out if you:
+            - Found a bug 🐛
+            - Have ideas for improvements ✨
+            - Want to request new features 🚀
+            - Have any questions or concerns ❓
+
+            **Contact:** Huy Nguyen on company Microsoft Teams
             """
         )
     elif tool_choice == "Prompt Engineering Assistant":

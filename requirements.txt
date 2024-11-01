@@ -9,6 +9,7 @@ beautifulsoup4
 youtube-transcript-api
 python-dotenv
 unstructured-client
+unstructured
 langchain
 langchain-openai
 langchain-community

@@ -1177,13 +1177,11 @@ async def streamlit_main():
 
     if tool_choice == "Home":
         st.markdown("""
-            # AI Assistant Hub
-            
             Welcome! This app provides various AI-powered assistants for internal use. 
             Choose an assistant from the sidebar to get started.
 
             ## Privacy Notice
-            - OpenAI will not look at conversations* and deletes data after 30 days
+            - In this app, OpenAI will not look at conversations and deletes data after 30 days
             - Chat histories are temporary and will be cleared when you close or refresh the page
 
             ## Usage Guidelines

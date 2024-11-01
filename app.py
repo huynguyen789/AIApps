@@ -1677,9 +1677,11 @@ async def streamlit_main():
         # Process query
         query = st.chat_input("Type your message here...")
         if query:
+            # Display user message
             with st.chat_message("user"):
                 st.write(query)
-                
+            
+            # Display assistant's streaming response
             with st.chat_message("assistant"):
                 message_placeholder = st.empty()
                 full_response = ""
@@ -1687,7 +1689,7 @@ async def streamlit_main():
                 for chunk in process_query(query, retriever, k, st.session_state.rag_conversation_history, filename=display_filename, verbose=verbose):
                     full_response += chunk
                     message_placeholder.markdown(full_response + "▌")
-                # message_placeholder.markdown(full_response)
+                message_placeholder.markdown(full_response)
             
             # Add new message to history and trim if needed
             st.session_state.rag_conversation_history.append((query, full_response))
@@ -1696,18 +1698,16 @@ async def streamlit_main():
                 max_words=50000
             )
 
-        # Display conversation history
-        chat_container = st.container()
-        with chat_container:
-            # Add a word count display
-            if st.session_state.rag_conversation_history:
-                total_words = sum(len(msg.split()) + len(resp.split()) 
-                                for msg, resp in st.session_state.rag_conversation_history)
-                st.caption(f"Current conversation length: {total_words:,} words")
-            
-            for user_msg, ai_msg in st.session_state.rag_conversation_history:
-                st.chat_message("user").write(user_msg)
-                st.chat_message("assistant").write(ai_msg)
+        # Display only previous conversation history (excluding the current streaming message)
+        for i, (user_msg, ai_msg) in enumerate(st.session_state.rag_conversation_history[:-1] if query else st.session_state.rag_conversation_history):
+            st.chat_message("user").write(user_msg)
+            st.chat_message("assistant").write(ai_msg)
+
+        # Add word count display
+        if st.session_state.rag_conversation_history:
+            total_words = sum(len(msg.split()) + len(resp.split()) 
+                            for msg, resp in st.session_state.rag_conversation_history)
+            st.caption(f"Current conversation length: {total_words:,} words")
 
         # Add New Chat button
         if st.button("New Chat"):

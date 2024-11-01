@@ -34,7 +34,7 @@ from langchain.schema import Document
 from langchain_openai import OpenAIEmbeddings
 from langchain_community.vectorstores import FAISS
 
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 import re
 from rank_bm25 import BM25Okapi
 import tempfile
@@ -43,61 +43,83 @@ from openai import OpenAI
 import logging
 logging.getLogger("openai").setLevel(logging.INFO)  # Change from ERROR to INFO to see the logs
 
+from docx import Document as DocxDocument  # For Word document handling
 
 # Initialize clients
 openai_client = AsyncOpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 anthropic_client = AsyncAnthropic(api_key=st.secrets["ANTHROPIC_API_KEY"])
 
-# UTILITIES
-def setup_model(model_name: str):
-    if model_name == "gemini":
-        api_key = st.secrets["GOOGLE_API_KEY"]
-        genai.configure(api_key=api_key)
-        
-        generation_config = {
-            "temperature": 0,
-            "max_output_tokens": 8192,
-        }
-        
-        safety_settings = [
-            {"category": "HARM_CATEGORY_DANGEROUS", "threshold": "BLOCK_NONE"},
-            {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
-            {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
-            {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
-            {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
-        ]
-        
-        return genai.GenerativeModel(
-            model_name="gemini-1.5-flash-002",
-            generation_config=generation_config,
-            safety_settings=safety_settings
-        )
-    elif model_name == "claude":
-        return AsyncAnthropic(api_key=st.secrets["ANTHROPIC_API_KEY"])
-    elif model_name == "gpt4":
-        return AsyncOpenAI(api_key=st.secrets["OPENAI_API_KEY"])
-    else:
-        raise ValueError(f"Unsupported model: {model_name}")
+# MODEL HANDLING
+def setup_gemini(model_variant: str = "flash"):
+    api_key = st.secrets["GOOGLE_API_KEY"]
+    genai.configure(api_key=api_key)
+    
+    generation_config = {
+        "temperature": 0,
+        "max_output_tokens": 8192,
+    }
+    
+    safety_settings = [
+        {"category": "HARM_CATEGORY_DANGEROUS", "threshold": "BLOCK_NONE"},
+        {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+        {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+        {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+        {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+    ]
+    
+    model_name = "gemini-1.5-flash-002" if model_variant == "flash" else "gemini-1.5-pro-002"
+    
+    return genai.GenerativeModel(
+        model_name=model_name,
+        generation_config=generation_config,
+        safety_settings=safety_settings
+    )
 
-async def generate_response(model, prompt):
-    if isinstance(model, genai.GenerativeModel):  # Gemini
+def get_model(model_name: str):
+    model_map = {
+        "gemini-flash": lambda: setup_gemini("flash"),
+        "gemini-pro": lambda: setup_gemini("pro"),
+        "claude": lambda: anthropic_client,
+        "gpt4": lambda: openai_client,
+    }
+    
+    if model_name not in model_map:
+        available_models = list(model_map.keys())
+        raise ValueError(f"Unsupported model: {model_name}. Available models: {available_models}")
+        
+    return model_map[model_name]()
+
+async def generate_response(model_name: str, prompt: str, system_prompt: Optional[str] = None):
+    model = get_model(model_name)
+    
+    if isinstance(model, genai.GenerativeModel):  # Gemini (both variants)
         response = model.generate_content(prompt, stream=True)
         for chunk in response:
             if chunk.text:
                 yield chunk.text
+                
     elif isinstance(model, AsyncAnthropic):  # Claude
+        messages = [{"role": "user", "content": prompt}]
+        if system_prompt:
+            messages.insert(0, {"role": "system", "content": system_prompt})
+            
         async with model.messages.stream(
             model="claude-3-5-sonnet-20241022",
             max_tokens=4096,
             temperature=0,
-            messages=[{"role": "user", "content": prompt}]
+            messages=messages
         ) as stream:
             async for text in stream.text_stream:
                 yield text
+                
     elif isinstance(model, AsyncOpenAI):  # GPT-4
+        messages = [{"role": "user", "content": prompt}]
+        if system_prompt:
+            messages.insert(0, {"role": "system", "content": system_prompt})
+            
         stream = await model.chat.completions.create(
             model="gpt-4o",
-            messages=[{"role": "user", "content": prompt}],
+            messages=messages,
             max_tokens=4096,
             temperature=0,
             stream=True
@@ -105,6 +127,33 @@ async def generate_response(model, prompt):
         async for chunk in stream:
             if chunk.choices[0].delta.content is not None:
                 yield chunk.choices[0].delta.content
+
+# Then update your existing functions to use the new generate_response function:
+
+async def generate_job_description(job_title, additional_requirements, is_pws):
+    main_prompt = load_prompt('job_description.txt')
+    
+    pws_instruction = "This is a PWS workflow. Follow the languages/wordings in the requirements strictly!!." if is_pws else ""
+    formatted_prompt = f"Job title: {job_title}. {additional_requirements} {pws_instruction} \n\n {main_prompt}"
+    
+    async for content in generate_response("gemini-flash", formatted_prompt):
+        formatted_text = content.replace('\n', '  \n')
+        yield formatted_text
+
+async def improve_job_description(original_jd, feedback, job_title, additional_requirements):
+    improve_prompt = load_prompt('improve_job_description.txt')
+    improve_input = f"""
+Original Job Title: {job_title}
+Additional Requirements: {additional_requirements}
+
+Original Job Description:
+{original_jd}
+
+User Feedback:
+{feedback}
+"""
+    async for content in generate_response("gpt4", improve_input, system_prompt=improve_prompt):
+        yield content
 
 def load_prompt(filename):
     with open(os.path.join('./prompts', filename), 'r') as file:
@@ -206,13 +255,9 @@ async def generate_job_description(job_title, additional_requirements, is_pws):
     pws_instruction = "This is a PWS workflow. Follow the languages/wordings in the requirements strictly!!." if is_pws else ""
     formatted_prompt = f"Job title: {job_title}. {additional_requirements} {pws_instruction} \n\n {main_prompt}"
     
-    model = setup_model("gemini")
-    response = model.generate_content(formatted_prompt, stream=True)
-    for chunk in response:
-        if chunk.text:
-            # Replace '\n' with two spaces and a newline for Markdown line breaks
-            formatted_text = chunk.text.replace('\n', '  \n')
-            yield formatted_text
+    async for content in generate_response("gemini-flash", formatted_prompt):
+        formatted_text = content.replace('\n', '  \n')
+        yield formatted_text
 
 async def improve_job_description(original_jd, feedback, job_title, additional_requirements):
     improve_prompt = load_prompt('improve_job_description.txt')
@@ -226,50 +271,24 @@ Original Job Description:
 User Feedback:
 {feedback}
 """
-    response = await openai_client.chat.completions.create(
-        model="gpt-4o",  # Changed from "gpt-4o" to "gpt-4"
-        messages=[
-            {"role": "system", "content": improve_prompt},
-            {"role": "user", "content": improve_input}
-        ],
-        stream=True,
-    )
-    async for chunk in response:
-        if chunk.choices[0].delta.content is not None:
-            yield chunk.choices[0].delta.content
+    async for content in generate_response("gpt4", improve_input, system_prompt=improve_prompt):
+        yield content
 #########################################################
 
 
 #Writing tools
 async def process_text(user_input, task):
-   
     prompts = {
-        "grammar": "Correct the grammar in the following text, return the correct content, output in a format that's easy for the user to copy. Also, show what was corrected:",
-        "rewrite": "Rewrite the following text professionally and concisely. Maintain the core message. Give few answers so user can select instead of only 1 option",
-        "summarize": "Summarize the following text concisely, capturing the main points:",
-        "explain": """Explain the following text in two parts in a super easy to way to understand and concise:
-        1. Explain it in a super simple way like the user is a 12 years old, with example.
-        2. Then, explain it in regular way.
-        
-        Make sure both explanations are clear and easy to understand."""
+        "grammar": "Correct the grammar in the following text...",
+        "rewrite": "Rewrite the following text professionally...",
+        "summarize": "Summarize the following text concisely...",
+        "explain": "Explain the following text in two parts..."
     }
    
     user_input = f'"{user_input}"'
     
-    response = await openai_client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[
-            {"role": "system", "content": prompts[task]},
-            {"role": "user", "content": user_input}
-        ],
-        stream=True,
-    )
-    processed_content = ""
-
-    async for chunk in response:
-        if chunk.choices[0].delta.content is not None:
-            processed_content += chunk.choices[0].delta.content
-            yield chunk.choices[0].delta.content
+    async for content in generate_response("gpt4", user_input, system_prompt=prompts[task]):
+        yield content
 
     # return processed_content
 #########################################################
@@ -412,7 +431,7 @@ def setup_ai_model(model_name: str):
         raise ValueError(f"Unsupported model: {model_name}")
 
 def create_word_document(markdown_content):
-    doc = Document()
+    doc = DocxDocument()
     
     # Set up styles
     styles = doc.styles
@@ -487,53 +506,18 @@ async def generate_monthly_status_report(model_name: str, master_content: str, e
         example_content=example_content
     )
     
-    model = setup_ai_model(model_name)
+    # Use Gemini Pro for more complex tasks
+    if model_name == "gemini":
+        model_name = "gemini-pro"  # Use Pro version for report generation
     
-    try:
-        full_response = ""
-        if model_name == "gemini":
-            response = model.generate_content(formatted_prompt, stream=True)
-            for chunk in response:
-                if chunk.text:
-                    full_response += chunk.text
-                    yield chunk.text
-        elif model_name == "claude":
-            async with anthropic.AsyncClient(api_key=st.secrets["ANTHROPIC_API_KEY"]) as aclient:
-                async with aclient.messages.stream(
-                    model="claude-3-5-sonnet-20241022",
-                    max_tokens=4096,
-                    temperature=0,
-                    messages=[
-                        {
-                            "role": "user",
-                            "content": formatted_prompt
-                        }
-                    ]
-                ) as stream:
-                    async for text in stream.text_stream:
-                        full_response += text
-                        yield text
-        elif model_name == "gpt4":
-            stream = await openai_client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[{"role": "user", "content": formatted_prompt}],
-                max_tokens=4096,
-                temperature=0,
-                stream=True
-            )
-            async for chunk in stream:
-                if chunk.choices[0].delta.content is not None:
-                    full_response += chunk.choices[0].delta.content
-                    yield chunk.choices[0].delta.content
-        
-        # After all chunks have been yielded, yield the full response
-        yield full_response
-    except Exception as e:
-        yield f"An error occurred: {e}"
+    async for content in generate_response(model_name, formatted_prompt):
+        yield content
 
 def read_file(file):
     if file.name.endswith('.docx'):
-        doc = Document(file)
+        # Use python-docx Document
+        from docx import Document as DocxDocument
+        doc = DocxDocument(file)
         full_text = []
         for element in doc.element.body:
             if element.tag.endswith('p'):
@@ -569,7 +553,7 @@ def save_markdown_to_file(markdown_content: str, file_path: str):
         md_file.write(markdown_content)
 
 def create_docx_from_markdown(markdown_content):
-    doc = Document()
+    doc = DocxDocument()
     doc.add_paragraph(markdown_content)
     return doc
 
@@ -750,7 +734,7 @@ async def search_and_summarize(query, model_choice, search_type, progress_callba
     model = setup_model(model_choice)
     response_container = st.empty()
     full_response = ""
-    async for content in generate_response(model, formatted_prompt):
+    async for content in generate_response(model_choice, formatted_prompt):
         full_response += content
         response_container.markdown(full_response)
 
@@ -1466,7 +1450,7 @@ async def streamlit_main():
             with open("./example/example.txt", 'r') as file:
                 example_content = file.read()
 
-            model_choice = st.selectbox("Choose AI model:", ["gemini", "gpt4", "claude"])
+            model_choice = st.selectbox("Choose AI model:", ["gemini-flash", "gemini-pro", "gpt4", "claude"])
 
             if st.button("Generate Report") or st.session_state.report_content:
                 if not st.session_state.report_content:

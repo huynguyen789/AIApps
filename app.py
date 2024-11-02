@@ -128,8 +128,6 @@ async def generate_response(model_name: str, prompt: str, system_prompt: Optiona
             if chunk.choices[0].delta.content is not None:
                 yield chunk.choices[0].delta.content
 
-# Then update your existing functions to use the new generate_response function:
-
 async def generate_job_description(job_title, additional_requirements, is_pws):
     main_prompt = load_prompt('job_description.txt')
     
@@ -159,6 +157,10 @@ def load_prompt(filename):
     with open(os.path.join('./prompts', filename), 'r') as file:
         return file.read()
 #########################################################
+
+
+
+
 
 #Prompt generation
 async def get_model_answer(instruction, prompt, model_name):
@@ -248,7 +250,7 @@ async def prompt_generator(user_request):
 #########################################################
 
 
-
+# Job Description
 async def generate_job_description(job_title, additional_requirements, is_pws):
     main_prompt = load_prompt('job_description.txt')
     
@@ -763,6 +765,10 @@ async def stream_response(prompt):
 #########################################################
 
 
+
+
+
+
 #RAG TOOL:
 # Load environment variables
 load_dotenv()
@@ -1107,7 +1113,6 @@ def initialize_retriever_from_cache(cache_file_path):
     vectorstore = FAISS.from_documents(documents, embeddings)
     return EnhancedRetriever(vectorstore, documents)
 
-
 @st.cache_resource
 def initialize_retriever(folder_path):
     strategy = "fast"
@@ -1139,6 +1144,60 @@ def trim_conversation_history(conversation_history, max_words=50000):
             return conversation_history[i+1:]
     
     return conversation_history
+#########################################################
+
+
+
+
+
+## Visual Document Chat Assistant
+def analyze_pdf_conversation(pdf_data_list, conversation_history, new_question):
+    '''
+    Input: List of PDF data (base64), conversation history, and new question
+    Process: Maintains chat context while using prompt caching
+    Output: Claude's response
+    '''
+    client = anthropic.Anthropic(api_key=st.secrets["ANTHROPIC_API_KEY"])
+    
+    # Create PDF document content list
+    pdf_documents = [
+        {
+            "type": "document",
+            "source": {
+                "type": "base64",
+                "media_type": "application/pdf",
+                "data": pdf_data
+            },
+            "cache_control": {"type": "ephemeral"}
+        }
+        for pdf_data in pdf_data_list
+    ]
+    
+    response = client.beta.messages.create(
+        model="claude-3-5-sonnet-20241022",
+        betas=["pdfs-2024-09-25", "prompt-caching-2024-07-31"],
+        max_tokens=3000,
+        messages=[
+            # First message with PDFs
+            {
+                "role": "user",
+                "content": pdf_documents
+            },
+            # Previous conversation history
+            *conversation_history,
+            # New question
+            {
+                "role": "user",
+                "content": [{"type": "text", "text": new_question}]
+            }
+        ]
+    )
+    
+    return response.content[0].text
+#########################################################
+
+
+
 
 #MAIN APP
 async def streamlit_main():
@@ -1163,7 +1222,8 @@ async def streamlit_main():
             "BD Response Assistant",
             "Job Description Assistant",
             "Monthly Report Assistant",
-            "Document Chat Assistant"
+            "Document Chat Assistant",
+            "Visual Document Chat Assistant"  # Added this line
         ])
     elif category == "Everyday Use":
         tool_choice = st.sidebar.radio("Choose a tool:", [
@@ -1591,20 +1651,20 @@ async def streamlit_main():
         st.header("Document Chat Assistant 📚")
         
         st.write("""
-        Welcome! This app helps you have a conversation with your documents. Here's how to use it:
+        Welcome! This app allows you to have a conversation with your documents, especially those that are large and text-dense. Here's how to use it:
         
         1. **Upload Documents**: Use the file uploader below to add your PDF files
         2. **Start Chatting**: Once processed, simply type your questions about the documents
-        3. **Get Answers**: The assistant will provide detailed responses based on your documents' content
+        3. **Get Answers**: The assistant will provide detailed responses based on your documents' text content
         4. **Save Your Chat**: Remember to click 'Export Chat' to save your conversation - chats are not permanently stored!
         
         Already uploaded files will appear in the dropdown menu below. Choose one to start chatting!
         """)
-        # Add warning about image limitations
+        # Add warning about visual content limitations
         st.warning("""
-            ⚠️ **Warnings**: 
-            - This assistant can only process text content from PDFs, not images. 
-            - Conversations are temporary and will be delete when you close or refresh the page
+            ⚠️ **Limitations**: 
+            - This assistant can handle large files but only processes text content, not visual content. 
+            - Conversations are temporary and will be deleted when you close or refresh the page.
         """)
 
         # Add model and parameter settings at the beginning
@@ -1719,6 +1779,93 @@ async def streamlit_main():
                     file_name=f"conversation_{timestamp}.txt",
                     mime="text/plain"
                 )
+
+    elif tool_choice == "Visual Document Chat Assistant":
+        st.header("Visual Document Chat Assistant 👁️")
+        
+        # Add instruction message
+        st.markdown("""
+        👁️ **Welcome to the Visual Document Chat Assistant!**
+        - This assistant can understand both text AND visual content (images, diagrams, charts)
+        - Perfect for analyzing documents containing visual information
+        - Limitation: The combined data size of uploaded PDFs should not exceed 31MB
+        """)
+
+        # Initialize session states
+        if "vdc_messages" not in st.session_state:
+            st.session_state.vdc_messages = []
+        if "vdc_pdf_data_list" not in st.session_state:
+            st.session_state.vdc_pdf_data_list = []
+
+        # Add reset button in the sidebar
+        if st.sidebar.button("Reset Chat"):
+            st.session_state.vdc_messages = []
+            st.rerun()
+
+        # File uploader with session state
+        uploaded_files = st.file_uploader(
+            "Upload your PDFs - Should be less than 31MB total", 
+            type="pdf", 
+            accept_multiple_files=True, 
+            help="Limit 31MB per file • PDF",
+            key="vdc_pdf_uploader"
+        )
+
+        if uploaded_files:
+            # Clear existing PDFs if new ones are uploaded
+            st.session_state.vdc_pdf_data_list = []
+            
+            for uploaded_file in uploaded_files:
+                # Check file size (31MB limit)
+                file_size = len(uploaded_file.read())
+                uploaded_file.seek(0)  # Reset file pointer
+                
+                if file_size > 31 * 1024 * 1024:
+                    st.error(f"File '{uploaded_file.name}' exceeds 31MB limit. This file will be skipped.")
+                else:
+                    # Add PDF data to session state list
+                    pdf_data = base64.b64encode(uploaded_file.read()).decode("utf-8")
+                    st.session_state.vdc_pdf_data_list.append(pdf_data)
+            
+            if st.session_state.vdc_pdf_data_list:
+                st.success(f"Successfully loaded {len(st.session_state.vdc_pdf_data_list)} PDF(s)")
+
+        # Show chat interface if we have PDF data
+        if st.session_state.vdc_pdf_data_list:
+            # Display chat messages
+            for message in st.session_state.vdc_messages:
+                with st.chat_message(message["role"]):
+                    st.write(message["content"])
+
+            # Chat input
+            if prompt := st.chat_input("Ask a question about your PDFs"):
+                # Display user message
+                with st.chat_message("user"):
+                    st.write(prompt)
+
+                # Add user message to chat history
+                st.session_state.vdc_messages.append({"role": "user", "content": prompt})
+
+                # Get AI response
+                try:
+                    with st.spinner("Analyzing documents..."):
+                        response = analyze_pdf_conversation(
+                            st.session_state.vdc_pdf_data_list,
+                            st.session_state.vdc_messages[:-1],
+                            prompt
+                        )
+                    
+                    # Display assistant response
+                    with st.chat_message("assistant"):
+                        st.write(response)
+                    
+                    # Add assistant response to chat history
+                    st.session_state.vdc_messages.append({"role": "assistant", "content": response})
+                    
+                except Exception as e:
+                    st.error(f"Error: {e}")
+        else:
+            st.info("Please upload one or more PDF files to start chatting!")
 
 
 if __name__ == "__main__":

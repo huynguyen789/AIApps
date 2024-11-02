@@ -48,7 +48,14 @@ def analyze_pdf_conversation(pdf_data_list, conversation_history, new_question):
     return response.content[0].text
 
 # Streamlit UI
-st.title("Chat with your PDFs")
+st.title("Visual Document Chat Assistant")
+
+# Add instruction message
+st.markdown("""
+📚 **Welcome!**
+- This assistant can understand both text AND visual content (images, diagrams, charts)
+- Perfect for analyzing documents containing visual information
+""")
 
 # Initialize session states
 if "messages" not in st.session_state:
@@ -62,7 +69,13 @@ if st.sidebar.button("Reset Chat"):
     st.rerun()
 
 # File uploader with session state
-uploaded_files = st.file_uploader("Upload your PDFs", type="pdf", accept_multiple_files=True, key="pdf_uploader")
+uploaded_files = st.file_uploader(
+    "Upload your PDFs - Should be less than 31MB total", 
+    type="pdf", 
+    accept_multiple_files=True, 
+    help="Limit 31MB per file • PDF",
+    key="pdf_uploader"
+)
 
 if uploaded_files:
     # Clear existing PDFs if new ones are uploaded

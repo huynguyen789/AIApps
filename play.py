@@ -3,33 +3,37 @@ import base64
 from pathlib import Path
 import streamlit as st
 
-def analyze_pdf_conversation(pdf_data, conversation_history, new_question):
+def analyze_pdf_conversation(pdf_data_list, conversation_history, new_question):
     '''
-    Input: PDF data (base64), conversation history, and new question
+    Input: List of PDF data (base64), conversation history, and new question
     Process: Maintains chat context while using prompt caching
     Output: Claude's response
     '''
     client = anthropic.Anthropic()
     
+    # Create PDF document content list
+    pdf_documents = [
+        {
+            "type": "document",
+            "source": {
+                "type": "base64",
+                "media_type": "application/pdf",
+                "data": pdf_data
+            },
+            "cache_control": {"type": "ephemeral"}
+        }
+        for pdf_data in pdf_data_list
+    ]
+    
     response = client.beta.messages.create(
         model="claude-3-5-sonnet-20241022",
         betas=["pdfs-2024-09-25", "prompt-caching-2024-07-31"],
-        max_tokens=2000,
+        max_tokens=3000,
         messages=[
-            # First message with PDF
+            # First message with PDFs
             {
                 "role": "user",
-                "content": [
-                    {
-                        "type": "document",
-                        "source": {
-                            "type": "base64",
-                            "media_type": "application/pdf",
-                            "data": pdf_data
-                        },
-                        "cache_control": {"type": "ephemeral"}
-                    }
-                ]
+                "content": pdf_documents
             },
             # Previous conversation history
             *conversation_history,
@@ -44,42 +48,51 @@ def analyze_pdf_conversation(pdf_data, conversation_history, new_question):
     return response.content[0].text
 
 # Streamlit UI
-st.title("Chat with your PDF")
+st.title("Chat with your PDFs")
 
 # Initialize session states
 if "messages" not in st.session_state:
     st.session_state.messages = []
-if "pdf_data" not in st.session_state:
-    st.session_state.pdf_data = None
+if "pdf_data_list" not in st.session_state:
+    st.session_state.pdf_data_list = []
 
 # Add reset button in the sidebar
 if st.sidebar.button("Reset Chat"):
     st.session_state.messages = []
+    st.session_state.pdf_data_list = []
     st.rerun()
 
 # File uploader with session state
-uploaded_file = st.file_uploader("Upload your PDF", type="pdf", key="pdf_uploader")
+uploaded_files = st.file_uploader("Upload your PDFs", type="pdf", accept_multiple_files=True, key="pdf_uploader")
 
-if uploaded_file is not None:
-    # Check file size (31MB = 31 * 1024 * 1024 bytes)
-    file_size = len(uploaded_file.read())
-    uploaded_file.seek(0)  # Reset file pointer after reading
+if uploaded_files:
+    # Clear existing PDFs if new ones are uploaded
+    st.session_state.pdf_data_list = []
     
-    if file_size > 31 * 1024 * 1024:
-        st.error("File size exceeds 31MB limit. Please upload a smaller PDF.")
-    else:
-        # Store PDF data in session state
-        st.session_state.pdf_data = base64.b64encode(uploaded_file.read()).decode("utf-8")
+    for uploaded_file in uploaded_files:
+        # Check file size (31MB limit)
+        file_size = len(uploaded_file.read())
+        uploaded_file.seek(0)  # Reset file pointer
+        
+        if file_size > 31 * 1024 * 1024:
+            st.error(f"File '{uploaded_file.name}' exceeds 31MB limit. This file will be skipped.")
+        else:
+            # Add PDF data to session state list
+            pdf_data = base64.b64encode(uploaded_file.read()).decode("utf-8")
+            st.session_state.pdf_data_list.append(pdf_data)
+    
+    if st.session_state.pdf_data_list:
+        st.success(f"Successfully loaded {len(st.session_state.pdf_data_list)} PDF(s)")
 
 # Show chat interface if we have PDF data
-if st.session_state.pdf_data:
+if st.session_state.pdf_data_list:
     # Display chat messages
     for message in st.session_state.messages:
         with st.chat_message(message["role"]):
             st.write(message["content"])
 
     # Chat input
-    if prompt := st.chat_input("Ask a question about your PDF"):
+    if prompt := st.chat_input("Ask a question about your PDFs"):
         # Display user message
         with st.chat_message("user"):
             st.write(prompt)
@@ -90,7 +103,7 @@ if st.session_state.pdf_data:
         # Get AI response
         try:
             response = analyze_pdf_conversation(
-                st.session_state.pdf_data,  # Use stored PDF data
+                st.session_state.pdf_data_list,  # Pass list of PDF data
                 st.session_state.messages[:-1],
                 prompt
             )
@@ -105,5 +118,5 @@ if st.session_state.pdf_data:
         except Exception as e:
             st.error(f"Error: {e}")
 else:
-    st.info("Please upload a PDF file to start chatting!")
+    st.info("Please upload one or more PDF files to start chatting!")
 

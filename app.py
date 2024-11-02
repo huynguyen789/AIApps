@@ -1155,7 +1155,20 @@ def analyze_pdf_conversation(pdf_data_list, conversation_history, new_question):
     '''
     Input: List of PDF data (base64), conversation history, and new question
     Process: Maintains chat context while using prompt caching
-    Output: Claude's response
+    Output: Streams Claude's response
+    
+    Key Insights:
+    1. Streaming Pattern: Use yield to stream chunks directly rather than accumulating
+    2. Memory Efficiency: Streaming reduces memory usage for large responses
+    3. Real-time Updates: Users see responses immediately rather than waiting
+    4. Error Handling: Easier to debug as issues show up immediately in stream
+    
+    Common Mistakes to Avoid:
+    1. Don't accumulate full response in streaming function
+    2. Don't mix streaming with regular returns
+    3. Don't double-display content (in stream and after)
+    4. Don't forget to handle stream chunks properly
+    5. Dont use async for this function
     '''
     client = anthropic.Anthropic(api_key=st.secrets["ANTHROPIC_API_KEY"])
     
@@ -1173,28 +1186,36 @@ def analyze_pdf_conversation(pdf_data_list, conversation_history, new_question):
         for pdf_data in pdf_data_list
     ]
     
+    # Stream response from Claude
+    # Note: We use stream=True for real-time output
     response = client.beta.messages.create(
         model="claude-3-5-sonnet-20241022",
         betas=["pdfs-2024-09-25", "prompt-caching-2024-07-31"],
         max_tokens=3000,
         messages=[
-            # First message with PDFs
+            # First message with PDFs - context setting
             {
                 "role": "user",
                 "content": pdf_documents
             },
-            # Previous conversation history
+            # Previous conversation history - maintains context
             *conversation_history,
-            # New question
+            # New question - current query
             {
                 "role": "user",
                 "content": [{"type": "text", "text": new_question}]
             }
-        ]
+        ],
+        stream=True
     )
-    
-    return response.content[0].text
+
+    # Stream each chunk directly
+    # This is the correct pattern for real-time streaming
+    for chunk in response:
+        if chunk.type == "content_block_delta":
+            yield chunk.delta.text
 #########################################################
+
 
 
 
@@ -1797,10 +1818,10 @@ async def streamlit_main():
         if "vdc_pdf_data_list" not in st.session_state:
             st.session_state.vdc_pdf_data_list = []
 
-        # Add reset button in the sidebar
-        if st.sidebar.button("Reset Chat"):
-            st.session_state.vdc_messages = []
-            st.rerun()
+        # # Add reset button in the sidebar
+        # if st.sidebar.button("Reset Chat"):
+        #     st.session_state.vdc_messages = []
+        #     st.rerun()
 
         # File uploader with session state
         uploaded_files = st.file_uploader(
@@ -1848,22 +1869,29 @@ async def streamlit_main():
 
                 # Get AI response
                 try:
-                    with st.spinner("Analyzing documents..."):
-                        response = analyze_pdf_conversation(
+                    # Display assistant's streaming response
+                    with st.chat_message("assistant"):
+                        message_placeholder = st.empty()
+                        full_response = ""
+                        for chunk in analyze_pdf_conversation(
                             st.session_state.vdc_pdf_data_list,
                             st.session_state.vdc_messages[:-1],
                             prompt
-                        )
+                        ):
+                            full_response += chunk
+                            message_placeholder.markdown(full_response + "▌")
+                        message_placeholder.markdown(full_response)  # Final update without cursor
                     
-                    # Display assistant response
-                    with st.chat_message("assistant"):
-                        st.write(response)
-                    
-                    # Add assistant response to chat history
-                    st.session_state.vdc_messages.append({"role": "assistant", "content": response})
+                    # Add to conversation history after complete
+                    st.session_state.vdc_messages.append({"role": "assistant", "content": full_response})
                     
                 except Exception as e:
                     st.error(f"Error: {e}")
+                    # Add reset button at the bottom of conversation
+            if st.session_state.vdc_messages:  # Only show reset button if there are messages
+                if st.button("Reset Chat"):
+                    st.session_state.vdc_messages = []
+                    st.rerun()
         else:
             st.info("Please upload one or more PDF files to start chatting!")
 

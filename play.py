@@ -59,7 +59,6 @@ if "pdf_data_list" not in st.session_state:
 # Add reset button in the sidebar
 if st.sidebar.button("Reset Chat"):
     st.session_state.messages = []
-    st.session_state.pdf_data_list = []
     st.rerun()
 
 # File uploader with session state

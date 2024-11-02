@@ -61,8 +61,15 @@ if st.sidebar.button("Reset Chat"):
 uploaded_file = st.file_uploader("Upload your PDF", type="pdf", key="pdf_uploader")
 
 if uploaded_file is not None:
-    # Store PDF data in session state
-    st.session_state.pdf_data = base64.b64encode(uploaded_file.read()).decode("utf-8")
+    # Check file size (31MB = 31 * 1024 * 1024 bytes)
+    file_size = len(uploaded_file.read())
+    uploaded_file.seek(0)  # Reset file pointer after reading
+    
+    if file_size > 31 * 1024 * 1024:
+        st.error("File size exceeds 31MB limit. Please upload a smaller PDF.")
+    else:
+        # Store PDF data in session state
+        st.session_state.pdf_data = base64.b64encode(uploaded_file.read()).decode("utf-8")
 
 # Show chat interface if we have PDF data
 if st.session_state.pdf_data:

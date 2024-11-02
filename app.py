@@ -1605,7 +1605,6 @@ async def streamlit_main():
             ⚠️ **Warnings**: 
             - This assistant can only process text content from PDFs, not images. 
             - Conversations are temporary and will be delete when you close or refresh the page
-            - Please do not upload any sensitive documents.
         """)
 
         # Add model and parameter settings at the beginning
@@ -1629,7 +1628,8 @@ async def streamlit_main():
                     try:
                         cache_file_name = process_uploaded_files(uploaded_files, custom_name)
                         st.success("PDFs processed successfully!")
-                        st.session_state.selected_folder = cache_file_name
+                        # Set the selected folder to the newly processed file
+                        st.session_state.rag_selected_folder = cache_file_name
                         st.rerun()
                     except Exception as e:
                         st.error(f"Error processing PDFs: {str(e)}")
@@ -1644,7 +1644,7 @@ async def streamlit_main():
 
         # Initialize session states for RAG specifically
         if 'rag_selected_folder' not in st.session_state:
-            default_file = "2025-redhorse holiday schedule_3886900744985613677_combined_content.json"
+            default_file = "2025 redhorse calandar_7018873614275482397.json"
             st.session_state.rag_selected_folder = default_file if default_file in folder_options else folder_options[0]
         if 'rag_conversation_history' not in st.session_state:
             st.session_state.rag_conversation_history = []
@@ -1670,6 +1670,12 @@ async def streamlit_main():
 
         # Process query
         query = st.chat_input("Type your message here...")
+
+        # Display conversation history first
+        for user_msg, ai_msg in st.session_state.rag_conversation_history:
+            st.chat_message("user").write(user_msg)
+            st.chat_message("assistant").write(ai_msg)
+
         if query:
             # Display user message
             with st.chat_message("user"):
@@ -1683,7 +1689,6 @@ async def streamlit_main():
                 for chunk in process_query(query, retriever, k, st.session_state.rag_conversation_history, filename=display_filename, verbose=verbose):
                     full_response += chunk
                     message_placeholder.markdown(full_response + "▌")
-                message_placeholder.markdown(full_response)
             
             # Add new message to history and trim if needed
             st.session_state.rag_conversation_history.append((query, full_response))
@@ -1691,11 +1696,6 @@ async def streamlit_main():
                 st.session_state.rag_conversation_history, 
                 max_words=50000
             )
-
-        # Display only previous conversation history (excluding the current streaming message)
-        for i, (user_msg, ai_msg) in enumerate(st.session_state.rag_conversation_history[:-1] if query else st.session_state.rag_conversation_history):
-            st.chat_message("user").write(user_msg)
-            st.chat_message("assistant").write(ai_msg)
 
         # Add word count display
         if st.session_state.rag_conversation_history:

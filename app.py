@@ -1808,6 +1808,9 @@ async def streamlit_main():
         - This assistant can understand both text AND visual content (images, diagrams, charts)
         - Perfect for analyzing documents containing visual information
         - Limitation: The combined data size of uploaded PDFs should not exceed 31MB
+        
+        ⏳ **Note**: The first response may take a bit longer (10-20 seconds) as the system processes and analyzes your documents. 
+        Subsequent responses will be much faster!
         """)
 
         # Initialize session states

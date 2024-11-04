@@ -600,7 +600,7 @@ def clean_content(soup):
             elif elem.name == 'table':
                 table_content = []
                 for row in elem.find_all('tr'):
-                    row_content = [cell.get_text(strip=True) for cell in row.find_all(['th', 'td'])]
+                    row_content = [cell.get_text(strip=True) for cell in row.findall(['th', 'td'])]
                     table_content.append(' | '.join(row_content))
                 content.append('\n'.join(table_content))
             # Handle links
@@ -1227,8 +1227,6 @@ async def streamlit_main():
 
     st.set_page_config(page_title="AI Assistant Tools", page_icon="🛠️", layout="wide")
 
-    st.title("AI Assistant Tools 🛠️")
-
     # Create categories in the sidebar
     st.sidebar.header("Categories")
     category = st.sidebar.radio("Select Category:", [
@@ -1725,7 +1723,7 @@ async def streamlit_main():
 
         # Initialize session states for RAG specifically
         if 'rag_selected_folder' not in st.session_state:
-            default_file = "2025 redhorse calandar_7018873614275482397.json"
+            default_file = "2025-benefits-docs_6220956148391947290.json"
             st.session_state.rag_selected_folder = default_file if default_file in folder_options else folder_options[0]
         if 'rag_conversation_history' not in st.session_state:
             st.session_state.rag_conversation_history = []

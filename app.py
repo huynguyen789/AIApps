@@ -1156,23 +1156,16 @@ def analyze_pdf_conversation(pdf_data_list, conversation_history, new_question):
     Input: List of PDF data (base64), conversation history, and new question
     Process: Maintains chat context while using prompt caching
     Output: Streams Claude's response
-    
-    Key Insights:
-    1. Streaming Pattern: Use yield to stream chunks directly rather than accumulating
-    2. Memory Efficiency: Streaming reduces memory usage for large responses
-    3. Real-time Updates: Users see responses immediately rather than waiting
-    4. Error Handling: Easier to debug as issues show up immediately in stream
-    
-    Common Mistakes to Avoid:
-    1. Don't accumulate full response in streaming function
-    2. Don't mix streaming with regular returns
-    3. Don't double-display content (in stream and after)
-    4. Don't forget to handle stream chunks properly
-    5. Dont use async for this function
     '''
-    client = anthropic.Anthropic(api_key=st.secrets["ANTHROPIC_API_KEY"])
+    # Update client initialization with beta header for PDF support
+    client = anthropic.Anthropic(
+        api_key=st.secrets["ANTHROPIC_API_KEY"],
+        default_headers={
+            "anthropic-beta": "pdfs-2024-09-25"  # Add beta header for PDF support
+        }
+    )
     
-    # Create PDF document content list
+    # Create PDF document content list with proper format
     pdf_documents = [
         {
             "type": "document",
@@ -1181,16 +1174,15 @@ def analyze_pdf_conversation(pdf_data_list, conversation_history, new_question):
                 "media_type": "application/pdf",
                 "data": pdf_data
             },
-            "cache_control": {"type": "ephemeral"}
+            "cache_control": {"type": "ephemeral"}  # Add cache control for better performance
         }
         for pdf_data in pdf_data_list
     ]
     
     # Stream response from Claude
-    # Note: We use stream=True for real-time output
     response = client.beta.messages.create(
         model="claude-3-5-sonnet-20241022",
-        betas=["pdfs-2024-09-25", "prompt-caching-2024-07-31"],
+        betas=["pdfs-2024-09-25", "prompt-caching-2024-07-31"],  # Add both betas
         max_tokens=3000,
         messages=[
             # First message with PDFs - context setting
@@ -1210,7 +1202,6 @@ def analyze_pdf_conversation(pdf_data_list, conversation_history, new_question):
     )
 
     # Stream each chunk directly
-    # This is the correct pattern for real-time streaming
     for chunk in response:
         if chunk.type == "content_block_delta":
             yield chunk.delta.text
@@ -1227,32 +1218,20 @@ async def streamlit_main():
 
     st.set_page_config(page_title="AI Assistant Tools", page_icon="🛠️", layout="wide")
 
-    # Create categories in the sidebar
-    st.sidebar.header("Categories")
-    category = st.sidebar.radio("Select Category:", [
+    # Remove category selection and show all tools directly
+    st.sidebar.header("Tools")
+    tool_choice = st.sidebar.radio("Choose a tool:", [
         "Home",
-        "Business Development",
-        "Everyday Use"
+        "BD Response Assistant",
+        "Job Description Assistant", 
+        "Monthly Report Assistant",
+        "Document Chat Assistant",
+        "Visual Document Chat Assistant",
+        "Search Assistant",
+        "Writing Assistant",
+        "Diagram Creation Assistant",
+        "Prompt Engineering Assistant"
     ])
-
-    # Organize tools by category
-    if category == "Business Development":
-        tool_choice = st.sidebar.radio("Choose a tool:", [
-            "BD Response Assistant",
-            "Job Description Assistant",
-            "Monthly Report Assistant",
-            "Document Chat Assistant",
-            "Visual Document Chat Assistant"  # Added this line
-        ])
-    elif category == "Everyday Use":
-        tool_choice = st.sidebar.radio("Choose a tool:", [
-            "Search Assistant",
-            "Writing Assistant",
-            "Diagram Creation Assistant",
-            "Prompt Engineering Assistant"
-        ])
-    else:  # Home
-        tool_choice = "Home"
 
     if tool_choice == "Home":
         st.markdown("""
@@ -1899,3 +1878,7 @@ async def streamlit_main():
 
 if __name__ == "__main__":
     asyncio.run(streamlit_main())
+
+def check_file_size(file_content):
+    size_mb = len(file_content) / (1024 * 1024)
+    return size_mb <= 31  # Claude's current PDF size limit

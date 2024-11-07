@@ -45,9 +45,46 @@ logging.getLogger("openai").setLevel(logging.INFO)  # Change from ERROR to INFO 
 
 from docx import Document as DocxDocument  # For Word document handling
 
+
 # Initialize clients
 openai_client = AsyncOpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 anthropic_client = AsyncAnthropic(api_key=st.secrets["ANTHROPIC_API_KEY"])
+
+
+#LOGIN
+# Initialize login attempt counter in session state
+if 'login_attempts' not in st.session_state:
+    st.session_state.login_attempts = 0
+
+def check_password():
+    """
+    Input: Password from user via text input
+    Process: Simple password validation against APP_PASSWORD in secrets
+    Output: Boolean indicating if password is correct
+    """
+    def password_entered():
+        if st.session_state["password"] == st.secrets["APP_PASSWORD"]:
+            st.session_state["password_correct"] = True
+            st.session_state.login_attempts = 0
+        else:
+            st.session_state["password_correct"] = False
+            st.session_state.login_attempts += 1
+            st.error(f"Incorrect password. Please try again.")
+
+    # First time or incorrect password - show input field
+    if "password_correct" not in st.session_state or not st.session_state["password_correct"]:
+        st.text_input(
+            "Please enter the password", 
+            type="password", 
+            on_change=password_entered, 
+            key="password"
+        )
+        return False
+    
+    return True
+#########################################################
+
+
 
 # MODEL HANDLING
 def setup_gemini(model_variant: str = "flash"):
@@ -76,6 +113,12 @@ def setup_gemini(model_variant: str = "flash"):
     )
 
 def get_model(model_name: str):
+    """
+    Input: model_name string
+    Process: Maps model name to appropriate client/setup function
+    Output: Model client or instance
+    """
+    # Define available models and their setup functions
     model_map = {
         "gemini-flash": lambda: setup_gemini("flash"),
         "gemini-pro": lambda: setup_gemini("pro"),
@@ -83,11 +126,31 @@ def get_model(model_name: str):
         "gpt4": lambda: openai_client,
     }
     
+    # Validate model name
     if model_name not in model_map:
-        available_models = list(model_map.keys())
+        available_models = ", ".join(model_map.keys())
         raise ValueError(f"Unsupported model: {model_name}. Available models: {available_models}")
-        
-    return model_map[model_name]()
+    
+    try:
+        # Get and return the model instance
+        return model_map[model_name]()
+    except Exception as e:
+        raise RuntimeError(f"Error initializing model {model_name}: {str(e)}")
+
+# Usage in Streamlit UI
+def render_model_selector():
+    """
+    Input: None
+    Process: Creates model selection dropdown
+    Output: Selected model name
+    """
+    available_models = ["gemini-flash", "gemini-pro", "claude", "gpt4"]
+    return st.selectbox(
+        "Choose AI model:",
+        options=available_models,
+        key="model_selector"
+    )
+    
 
 async def generate_response(model_name: str, prompt: str, system_prompt: Optional[str] = None):
     model = get_model(model_name)
@@ -127,7 +190,11 @@ async def generate_response(model_name: str, prompt: str, system_prompt: Optiona
         async for chunk in stream:
             if chunk.choices[0].delta.content is not None:
                 yield chunk.choices[0].delta.content
+#########################################################
 
+
+
+#JOB DESCRIPTION
 async def generate_job_description(job_title, additional_requirements, is_pws):
     main_prompt = load_prompt('job_description.txt')
     
@@ -733,7 +800,7 @@ async def search_and_summarize(query, model_choice, search_type, progress_callba
     )
     
     # Use the selected model for generating the response
-    model = setup_model(model_choice)
+    model = get_model(model_choice)
     response_container = st.empty()
     full_response = ""
     async for content in generate_response(model_choice, formatted_prompt):
@@ -1148,9 +1215,32 @@ def trim_conversation_history(conversation_history, max_words=50000):
 
 
 
+# Modify the main function to include password check
+async def streamlit_main():
+    # Disable OpenAI request logging
+    logging.getLogger("openai").setLevel(logging.INFO)
 
+    st.set_page_config(page_title="AI Assistant Tools", page_icon="🛠️", layout="wide")
 
+    # Check password before showing content
+    if not check_password():
+        st.stop()  # Do not continue if password check fails
+        
+    # Rest of your existing main code...
+    st.sidebar.header("Tools")
+    tool_choice = st.sidebar.radio("Choose a tool:", [
+        "Home",
+        "BD Response Assistant",
+        "Job Description Assistant",
+        # ... rest of your tools
+    ])
+    
+    # Your existing tool logic...
 ## Visual Document Chat Assistant
+def check_file_size(file_content):
+    size_mb = len(file_content) / (1024 * 1024)
+    return size_mb <= 31  # Claude's current PDF size limit 
+
 def analyze_pdf_conversation(pdf_data_list, conversation_history, new_question):
     '''
     Input: List of PDF data (base64), conversation history, and new question
@@ -1218,6 +1308,10 @@ async def streamlit_main():
 
     st.set_page_config(page_title="AI Assistant Tools", page_icon="🛠️", layout="wide")
 
+    # Check password before showing content
+    if not check_password():
+        st.stop()  # Do not continue if password check fails
+        
     # Remove category selection and show all tools directly
     st.sidebar.header("Tools")
     tool_choice = st.sidebar.radio("Choose a tool:", [
@@ -1518,7 +1612,7 @@ async def streamlit_main():
             with open("./example/example.txt", 'r') as file:
                 example_content = file.read()
 
-            model_choice = st.selectbox("Choose AI model:", ["gemini-flash", "gemini-pro", "gpt4", "claude"])
+            model_choice = st.selectbox("Choose AI model:", options= ["gemini-flash", "gemini-pro", "gpt4", "claude"])
 
             if st.button("Generate Report") or st.session_state.report_content:
                 if not st.session_state.report_content:
@@ -1574,15 +1668,19 @@ async def streamlit_main():
         if 'search_query' not in st.session_state:
             st.session_state.search_query = ""
         if 'search_model_choice' not in st.session_state:
-            st.session_state.search_model_choice = "gemini"
+            st.session_state.search_model_choice = "gemini-flash"  # Updated default value
         if 'search_type' not in st.session_state:
             st.session_state.search_type = "Fast (up to 5 sources)"
         if 'search_results' not in st.session_state:
             st.session_state.search_results = None
-
+            
         # Use session state for the input fields
         query = st.text_input("Enter your search query:", key="search_query_input")
-        model_choice = st.selectbox("Choose AI model (Optional):", ["gemini", "gpt4", "claude"], key="search_model_choice")
+        model_choice = st.selectbox(
+            "Choose AI model (Optional):", 
+            ["gemini-flash", "gemini-pro", "claude", "gpt4"], 
+            key="search_model_choice",
+            index=["gemini-flash", "gemini-pro", "claude", "gpt4"].index(st.session_state.search_model_choice) )     
         search_type = st.radio("Search Type:", ["Fast (up to 5 sources)", "Deep (up to 10 sources)"], key="search_type")
 
         async def run_search():
@@ -1879,6 +1977,4 @@ async def streamlit_main():
 if __name__ == "__main__":
     asyncio.run(streamlit_main())
 
-def check_file_size(file_content):
-    size_mb = len(file_content) / (1024 * 1024)
-    return size_mb <= 31  # Claude's current PDF size limit
+

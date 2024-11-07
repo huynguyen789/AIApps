@@ -23,62 +23,103 @@ from docx.shared import Pt
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.enum.style import WD_STYLE_TYPE
 from docx.shared import Inches
+import glob
+from dotenv import load_dotenv
 
+from unstructured_client import UnstructuredClient
+from unstructured_client.models import shared, operations
+from unstructured.staging.base import dict_to_elements
+from unstructured.chunking.title import chunk_by_title
+from langchain.schema import Document
+from langchain_openai import OpenAIEmbeddings
+from langchain_community.vectorstores import FAISS
+
+from typing import List, Tuple, Optional
+import re
+from rank_bm25 import BM25Okapi
+import tempfile
+from openai import OpenAI
+# At the top of your file after imports
+import logging
+logging.getLogger("openai").setLevel(logging.INFO)  # Change from ERROR to INFO to see the logs
+
+from docx import Document as DocxDocument  # For Word document handling
 
 # Initialize clients
 openai_client = AsyncOpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 anthropic_client = AsyncAnthropic(api_key=st.secrets["ANTHROPIC_API_KEY"])
 
-# UTILITIES
-def setup_model(model_name: str):
-    if model_name == "gemini":
-        api_key = st.secrets["GOOGLE_API_KEY"]
-        genai.configure(api_key=api_key)
-        
-        generation_config = {
-            "temperature": 0,
-            "max_output_tokens": 8192,
-        }
-        
-        safety_settings = [
-            {"category": "HARM_CATEGORY_DANGEROUS", "threshold": "BLOCK_NONE"},
-            {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
-            {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
-            {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
-            {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
-        ]
-        
-        return genai.GenerativeModel(
-            model_name="gemini-1.5-flash-002",
-            generation_config=generation_config,
-            safety_settings=safety_settings
-        )
-    elif model_name == "claude":
-        return AsyncAnthropic(api_key=st.secrets["ANTHROPIC_API_KEY"])
-    elif model_name == "gpt4":
-        return AsyncOpenAI(api_key=st.secrets["OPENAI_API_KEY"])
-    else:
-        raise ValueError(f"Unsupported model: {model_name}")
+# MODEL HANDLING
+def setup_gemini(model_variant: str = "flash"):
+    api_key = st.secrets["GOOGLE_API_KEY"]
+    genai.configure(api_key=api_key)
+    
+    generation_config = {
+        "temperature": 0,
+        "max_output_tokens": 8192,
+    }
+    
+    safety_settings = [
+        {"category": "HARM_CATEGORY_DANGEROUS", "threshold": "BLOCK_NONE"},
+        {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+        {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+        {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+        {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+    ]
+    
+    model_name = "gemini-1.5-flash-002" if model_variant == "flash" else "gemini-1.5-pro-002"
+    
+    return genai.GenerativeModel(
+        model_name=model_name,
+        generation_config=generation_config,
+        safety_settings=safety_settings
+    )
 
-async def generate_response(model, prompt):
-    if isinstance(model, genai.GenerativeModel):  # Gemini
+def get_model(model_name: str):
+    model_map = {
+        "gemini-flash": lambda: setup_gemini("flash"),
+        "gemini-pro": lambda: setup_gemini("pro"),
+        "claude": lambda: anthropic_client,
+        "gpt4": lambda: openai_client,
+    }
+    
+    if model_name not in model_map:
+        available_models = list(model_map.keys())
+        raise ValueError(f"Unsupported model: {model_name}. Available models: {available_models}")
+        
+    return model_map[model_name]()
+
+async def generate_response(model_name: str, prompt: str, system_prompt: Optional[str] = None):
+    model = get_model(model_name)
+    
+    if isinstance(model, genai.GenerativeModel):  # Gemini (both variants)
         response = model.generate_content(prompt, stream=True)
         for chunk in response:
             if chunk.text:
                 yield chunk.text
+                
     elif isinstance(model, AsyncAnthropic):  # Claude
+        messages = [{"role": "user", "content": prompt}]
+        if system_prompt:
+            messages.insert(0, {"role": "system", "content": system_prompt})
+            
         async with model.messages.stream(
-            model="claude-3-5-sonnet-20240620",
+            model="claude-3-5-sonnet-20241022",
             max_tokens=4096,
             temperature=0,
-            messages=[{"role": "user", "content": prompt}]
+            messages=messages
         ) as stream:
             async for text in stream.text_stream:
                 yield text
+                
     elif isinstance(model, AsyncOpenAI):  # GPT-4
+        messages = [{"role": "user", "content": prompt}]
+        if system_prompt:
+            messages.insert(0, {"role": "system", "content": system_prompt})
+            
         stream = await model.chat.completions.create(
             model="gpt-4o",
-            messages=[{"role": "user", "content": prompt}],
+            messages=messages,
             max_tokens=4096,
             temperature=0,
             stream=True
@@ -87,10 +128,39 @@ async def generate_response(model, prompt):
             if chunk.choices[0].delta.content is not None:
                 yield chunk.choices[0].delta.content
 
+async def generate_job_description(job_title, additional_requirements, is_pws):
+    main_prompt = load_prompt('job_description.txt')
+    
+    pws_instruction = "This is a PWS workflow. Follow the languages/wordings in the requirements strictly!!." if is_pws else ""
+    formatted_prompt = f"Job title: {job_title}. {additional_requirements} {pws_instruction} \n\n {main_prompt}"
+    
+    async for content in generate_response("gemini-flash", formatted_prompt):
+        formatted_text = content.replace('\n', '  \n')
+        yield formatted_text
+
+async def improve_job_description(original_jd, feedback, job_title, additional_requirements):
+    improve_prompt = load_prompt('improve_job_description.txt')
+    improve_input = f"""
+Original Job Title: {job_title}
+Additional Requirements: {additional_requirements}
+
+Original Job Description:
+{original_jd}
+
+User Feedback:
+{feedback}
+"""
+    async for content in generate_response("gpt4", improve_input, system_prompt=improve_prompt):
+        yield content
+
 def load_prompt(filename):
     with open(os.path.join('./prompts', filename), 'r') as file:
         return file.read()
 #########################################################
+
+
+
+
 
 #Prompt generation
 async def get_model_answer(instruction, prompt, model_name):
@@ -124,7 +194,7 @@ def remove_analysis(prompt):
     return re.sub(r'<analysis>.*?</analysis>', '', prompt, flags=re.DOTALL)
 
 async def prompt_generator(user_request):
-    optimizer_model = "claude-3-5-sonnet-20240620"  # or "gpt-4-0125-preview"
+    optimizer_model = "claude-3-5-sonnet-20241022"  # or "gpt-4-0125-preview"
     
     if 'current_prompt' not in st.session_state:
         st.session_state.current_prompt = None
@@ -180,20 +250,16 @@ async def prompt_generator(user_request):
 #########################################################
 
 
-
+# Job Description
 async def generate_job_description(job_title, additional_requirements, is_pws):
     main_prompt = load_prompt('job_description.txt')
     
     pws_instruction = "This is a PWS workflow. Follow the languages/wordings in the requirements strictly!!." if is_pws else ""
     formatted_prompt = f"Job title: {job_title}. {additional_requirements} {pws_instruction} \n\n {main_prompt}"
     
-    model = setup_model("gemini")
-    response = model.generate_content(formatted_prompt, stream=True)
-    for chunk in response:
-        if chunk.text:
-            # Replace '\n' with two spaces and a newline for Markdown line breaks
-            formatted_text = chunk.text.replace('\n', '  \n')
-            yield formatted_text
+    async for content in generate_response("gemini-flash", formatted_prompt):
+        formatted_text = content.replace('\n', '  \n')
+        yield formatted_text
 
 async def improve_job_description(original_jd, feedback, job_title, additional_requirements):
     improve_prompt = load_prompt('improve_job_description.txt')
@@ -207,53 +273,28 @@ Original Job Description:
 User Feedback:
 {feedback}
 """
-    response = await openai_client.chat.completions.create(
-        model="gpt-4o",  # Changed from "gpt-4o" to "gpt-4"
-        messages=[
-            {"role": "system", "content": improve_prompt},
-            {"role": "user", "content": improve_input}
-        ],
-        stream=True,
-    )
-    async for chunk in response:
-        if chunk.choices[0].delta.content is not None:
-            yield chunk.choices[0].delta.content
+    async for content in generate_response("gpt4", improve_input, system_prompt=improve_prompt):
+        yield content
 #########################################################
 
 
 #Writing tools
 async def process_text(user_input, task):
-   
     prompts = {
-        "grammar": "Correct the grammar in the following text, return the correct content, output in a format that's easy for the user to copy. Also, show what was corrected:",
-        "rewrite": "Rewrite the following text professionally and concisely. Maintain the core message. Give few answers so user can select instead of only 1 option",
-        "summarize": "Summarize the following text concisely, capturing the main points:",
-        "explain": """Explain the following text in two parts in a super easy to way to understand and concise:
-        1. Explain it in a super simple way like the user is a 12 years old, with example.
-        2. Then, explain it in regular way.
-        
-        Make sure both explanations are clear and easy to understand."""
+        "grammar": "Correct the grammar in the following text...",
+        "rewrite": "Rewrite the following text professionally...",
+        "summarize": "Summarize the following text concisely...",
+        "explain": "Explain the following text in two parts..."
     }
    
     user_input = f'"{user_input}"'
     
-    response = await openai_client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[
-            {"role": "system", "content": prompts[task]},
-            {"role": "user", "content": user_input}
-        ],
-        stream=True,
-    )
-    processed_content = ""
-
-    async for chunk in response:
-        if chunk.choices[0].delta.content is not None:
-            processed_content += chunk.choices[0].delta.content
-            yield chunk.choices[0].delta.content
+    async for content in generate_response("gpt4", user_input, system_prompt=prompts[task]):
+        yield content
 
     # return processed_content
 #########################################################
+
 
 #BD Response Assistant
 async def get_feedback(document, requirements, user_instructions):
@@ -312,7 +353,7 @@ async def generate_mermaid_diagram(description):
     user_input = f"Create a Mermaid diagram for: {description}"
     
     response = await anthropic_client.messages.create(
-        model="claude-3-5-sonnet-20240620",
+        model="claude-3-5-sonnet-20241022",
         max_tokens=3000,
         temperature=0,
         system=prompt,
@@ -392,7 +433,7 @@ def setup_ai_model(model_name: str):
         raise ValueError(f"Unsupported model: {model_name}")
 
 def create_word_document(markdown_content):
-    doc = Document()
+    doc = DocxDocument()
     
     # Set up styles
     styles = doc.styles
@@ -467,53 +508,18 @@ async def generate_monthly_status_report(model_name: str, master_content: str, e
         example_content=example_content
     )
     
-    model = setup_ai_model(model_name)
+    # Use Gemini Pro for more complex tasks
+    if model_name == "gemini":
+        model_name = "gemini-pro"  # Use Pro version for report generation
     
-    try:
-        full_response = ""
-        if model_name == "gemini":
-            response = model.generate_content(formatted_prompt, stream=True)
-            for chunk in response:
-                if chunk.text:
-                    full_response += chunk.text
-                    yield chunk.text
-        elif model_name == "claude":
-            async with anthropic.AsyncClient(api_key=st.secrets["ANTHROPIC_API_KEY"]) as aclient:
-                async with aclient.messages.stream(
-                    model="claude-3-5-sonnet-20240620",
-                    max_tokens=4096,
-                    temperature=0,
-                    messages=[
-                        {
-                            "role": "user",
-                            "content": formatted_prompt
-                        }
-                    ]
-                ) as stream:
-                    async for text in stream.text_stream:
-                        full_response += text
-                        yield text
-        elif model_name == "gpt4":
-            stream = await openai_client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[{"role": "user", "content": formatted_prompt}],
-                max_tokens=4096,
-                temperature=0,
-                stream=True
-            )
-            async for chunk in stream:
-                if chunk.choices[0].delta.content is not None:
-                    full_response += chunk.choices[0].delta.content
-                    yield chunk.choices[0].delta.content
-        
-        # After all chunks have been yielded, yield the full response
-        yield full_response
-    except Exception as e:
-        yield f"An error occurred: {e}"
+    async for content in generate_response(model_name, formatted_prompt):
+        yield content
 
 def read_file(file):
     if file.name.endswith('.docx'):
-        doc = Document(file)
+        # Use python-docx Document
+        from docx import Document as DocxDocument
+        doc = DocxDocument(file)
         full_text = []
         for element in doc.element.body:
             if element.tag.endswith('p'):
@@ -549,7 +555,7 @@ def save_markdown_to_file(markdown_content: str, file_path: str):
         md_file.write(markdown_content)
 
 def create_docx_from_markdown(markdown_content):
-    doc = Document()
+    doc = DocxDocument()
     doc.add_paragraph(markdown_content)
     return doc
 
@@ -594,7 +600,7 @@ def clean_content(soup):
             elif elem.name == 'table':
                 table_content = []
                 for row in elem.find_all('tr'):
-                    row_content = [cell.get_text(strip=True) for cell in row.find_all(['th', 'td'])]
+                    row_content = [cell.get_text(strip=True) for cell in row.findall(['th', 'td'])]
                     table_content.append(' | '.join(row_content))
                 content.append('\n'.join(table_content))
             # Handle links
@@ -615,7 +621,6 @@ def clean_content(soup):
         return cleaned_content
     else:
         return "No main content found."
-
 
 async def search_and_summarize(query, model_choice, search_type, progress_callback=None):
     if progress_callback:
@@ -731,7 +736,7 @@ async def search_and_summarize(query, model_choice, search_type, progress_callba
     model = setup_model(model_choice)
     response_container = st.empty()
     full_response = ""
-    async for content in generate_response(model, formatted_prompt):
+    async for content in generate_response(model_choice, formatted_prompt):
         full_response += content
         response_container.markdown(full_response)
 
@@ -764,32 +769,497 @@ async def stream_response(prompt):
 
 
 
+#RAG TOOL:
+# Load environment variables
+load_dotenv()
+openai_api_key = st.secrets["OPENAI_API_KEY"]
+client = OpenAI(api_key=openai_api_key)
+
+# Get unstructured API key
+unstructured_api_key = os.getenv("UNSTRUCTURED_API_KEY")
+if not unstructured_api_key:
+    raise ValueError("UNSTRUCTURED_API_KEY environment variable not found")
+
+class EnhancedRetriever:
+    def __init__(self, vectorstore, documents):
+        self.vectorstore = vectorstore
+        self.documents = documents
+        self.bm25 = self._create_bm25_index()
+
+    def _create_bm25_index(self):
+        tokenized_docs = [self._tokenize(doc.page_content) for doc in self.documents]
+        return BM25Okapi(tokenized_docs)
+
+    def _tokenize(self, text: str) -> List[str]:
+        tokens = re.findall(r'\b\d+(?:\.\d+)*(?:\s+[A-Za-z]+(?:\s+[A-Za-z]+)*)?\b|\w+', text.lower())
+        return tokens
+
+    def hybrid_search(self, query: str, k: int = 4, verbose: bool = False) -> List[Tuple[float, Document]]:
+        # Get k semantic results and 1 keyword result
+        vector_results = self.vectorstore.similarity_search_with_score(query, k=k)
+        keyword_results = self.keyword_search(query, k=1)
+        
+        if verbose:
+            st.write(f"🔍 Semantic search returned: {len(vector_results)} results")
+            st.write(f"🔑 Keyword search returned: {len(keyword_results)} results")
+        
+        combined_results = {}
+        query_keywords = set(query.lower().split())
+        
+        # Always include all semantic search results
+        for doc, score in vector_results:
+            combined_results[doc.page_content] = {'doc': doc, 'vector_score': score, 'keyword_score': 0, 'exact_match': False}
+            doc_words = set(doc.page_content.lower().split())
+            if query_keywords.issubset(doc_words):
+                combined_results[doc.page_content]['exact_match'] = True
+        
+        # Always include keyword search result, even if it creates a new entry
+        for score, doc in keyword_results:
+            if doc.page_content in combined_results:
+                combined_results[doc.page_content]['keyword_score'] = score
+            else:
+                # Always add keyword result as a new entry if not already present
+                combined_results[doc.page_content] = {'doc': doc, 'vector_score': 0, 'keyword_score': score, 'exact_match': False}
+            
+            doc_words = set(doc.page_content.lower().split())
+            if query_keywords.issubset(doc_words):
+                combined_results[doc.page_content]['exact_match'] = True
+        
+        # After processing all results, check if any exact matches were found
+        exact_matches = [content for content, scores in combined_results.items() if scores['exact_match']]
+        if exact_matches:
+            st.write("✨ Found exact matches for query terms!")
+        else:
+            st.write("📝 No exact matches found for query terms")
+        
+        final_results = []
+        for content, scores in combined_results.items():
+            normalized_vector_score = 1 / (1 + scores['vector_score'])
+            normalized_keyword_score = scores['keyword_score']
+            exact_match_bonus = 2 if scores['exact_match'] else 0
+            combined_score = (normalized_vector_score + normalized_keyword_score + exact_match_bonus) / 3
+            
+            # Add source information to the document metadata
+            scores['doc'].metadata['search_source'] = []
+            if scores['vector_score'] > 0:
+                scores['doc'].metadata['search_source'].append('semantic')
+            if scores['keyword_score'] > 0:
+                scores['doc'].metadata['search_source'].append('keyword')
+            
+            final_results.append((combined_score, scores['doc']))
+        
+        final_results = sorted(final_results, key=lambda x: x[0], reverse=True)
+        
+        if verbose:
+            st.write(f"📊 Final combined results: {len(final_results)} documents")
+            st.write(f"🔍 First 5 results:")
+            for score, doc in final_results[:5]:
+                st.write(f"Score: {score:.4f}")
+                st.write(f"🔎 {' & '.join(doc.metadata['search_source']).title()} Search")
+                st.write(f"Content: {doc.page_content[:200]}...")
+                st.write("---")
+        
+        return final_results
+
+    def keyword_search(self, query: str, k: int = 4) -> List[Tuple[float, Document]]:
+        tokenized_query = self._tokenize(query)
+        bm25_scores = self.bm25.get_scores(tokenized_query)
+        scored_docs = [(score, self.documents[i]) for i, score in enumerate(bm25_scores)]
+        return sorted(scored_docs, key=lambda x: x[0], reverse=True)[:k]
+
+def process_pdfs_and_cache(input_folder, output_folder, strategy, cache_file_path=None):
+    """Process PDFs and cache results. If cache_file_path is provided, use that instead of generating one."""
+    s = UnstructuredClient(
+        api_key_auth=st.secrets["UNSTRUCTURED_API_KEY"],
+        server_url='https://redhorse-d652ahtg.api.unstructuredapp.io'
+    )
+
+    os.makedirs(output_folder, exist_ok=True)
+    
+    # If no specific cache path provided, generate one from the input folder
+    if cache_file_path is None:
+        folder_name = os.path.basename(os.path.normpath(input_folder))
+        cache_file_path = os.path.join(output_folder, f'{folder_name}_combined_content.json')
+    
+    # Check if cache exists first
+    if os.path.exists(cache_file_path):
+        st.info("Using cached version of the processed files.")
+        with open(cache_file_path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+            
+    # Only process if cache doesn't exist
+    combined_content = []
+    pdf_files = glob.glob(os.path.join(input_folder, "*.pdf"))
+    
+    if not pdf_files:
+        raise ValueError(f"No PDF files found in {input_folder}")
+        
+    total_files = len(pdf_files)
+    for idx, filename in enumerate(pdf_files, 1):
+        st.write(f"Processing file {idx}/{total_files}: {os.path.basename(filename)}")
+        
+        try:
+            with open(filename, "rb") as file:
+                partition_params = shared.PartitionParameters(
+                    files=shared.Files(
+                        content=file.read(),
+                        file_name=os.path.basename(filename),
+                    ),
+                    strategy=strategy,
+                )
+                req = operations.PartitionRequest(
+                    partition_parameters=partition_params
+                )
+                res = s.general.partition(request=req)
+                combined_content.extend(res.elements)
+                st.write(f"✅ Successfully processed {os.path.basename(filename)}")
+        except Exception as e:
+            st.error(f"Error processing {os.path.basename(filename)}: {str(e)}")
+            continue
+
+    # Save directly to cache file if processing was successful
+    if combined_content:
+        with open(cache_file_path, 'w', encoding='utf-8') as f:
+            json.dump(combined_content, f)
+        st.success(f"Successfully processed {total_files} files and saved to cache")
+    else:
+        st.error("No content was successfully processed")
+
+    return combined_content
+
+def process_data(combined_content):
+    pdf_elements = dict_to_elements(combined_content)
+    elements = chunk_by_title(pdf_elements, combine_text_under_n_chars=4000, max_characters=8000, new_after_n_chars=7000, overlap=1000)
+    documents = []
+    for element in elements:
+        metadata = element.metadata.to_dict()
+        metadata.pop("languages", None)
+        metadata["source"] = metadata["filename"]
+        documents.append(Document(page_content=element.text, metadata=metadata))
+    return documents
+
+def organize_documents(docs):
+    organized_text = ""
+    for i, doc in enumerate(docs, start=1):
+        source = doc.metadata.get('source', 'unknown source')
+        page_number = doc.metadata.get('page_number', 'unknown page number')
+        organized_text += f"Document {i}:\nSource: {source}\nPage number: {page_number}\nContent: {doc.page_content}\n\n"
+    return organized_text
+
+def generate_answer(query: str, relevant_data: str, filename: str):
+    prompt = f"""
+    <retrieval data>
+    {relevant_data}
+    </retrieval data>
+    
+    <user query>
+    {query}
+    </user query>
+    
+    <instructions>
+    You are a world-class RAG system. Your task is to give exceptional, useful, and truthful answers, based on the user's query and the provided relevant data.
+
+    Guidelines:
+    - Provide clear, accurate answers using only the given information. If information is insufficient, acknowledge limitations.
+    - Connect related sections if they appear fragmented (check section numbers)
+    - Use natural, easy to understand language.
+    - Structure the answer in a super nice and easy to view with title, subtitle, and bullet points.
+    - Remember you are discussing content from: {filename}
+
+    Format your response in 3 parts:
+    1. Short answer: Short and concise answer. 
+    2. Detailed answer: Comprehensive answer with exact words in quotation marks (as much as possible) and examples where relevant. 
+    3. Sources: Reference specific documents/pages used, links. 
+    
+    Answer in a nice markdown format:
+    </instructions>
+    """
+
+    response = client.chat.completions.create(
+        model="gpt-4o",
+        messages=[
+            {"role": "system", "content": prompt},
+        ],
+        stream=True,
+    )
+    
+    for chunk in response:
+        if chunk.choices[0].delta.content is not None:
+            yield chunk.choices[0].delta.content
+
+def extract_search_keywords(query: str, filename: str = "") -> str:
+    prompt = f"""
+    This is a RAG system with semantic and keyword search.
+    
+    <context>
+    You are searching through documents from: {filename}
+    </context>
+    
+    Your task is to extract the most relevant search keywords or phrases from this query for searching through documents.
+    Focus on specific terms, section numbers, or phrases that are likely to yield the most relevant results.
+    If user asked for a summary, should search for 'table of content' and other words that can get good results.
+    Return your answer as a comma-separated string of keywords.
+    
+    Consider the document context when selecting keywords. For example:
+    - If the filename suggests a technical document, prioritize technical terms
+    - If it's a policy document, focus on policy-related terms
+    - If it's a proposal, look for proposal-specific terminology
+    
+    User query: {query}
+    Document context: {filename}
+    """
+    
+    response = client.chat.completions.create(
+        model="gpt-4o",
+        messages=[
+            {"role": "system", "content": prompt},
+            {"role": "user", "content": query}
+        ],
+        temperature=0
+    )
+    result = response.choices[0].message.content
+    print(f"Extracted keyword: {result}")
+    return result.strip()
+
+def rag_query_enhanced(user_query: str, enhanced_retriever: EnhancedRetriever, k: int = 4, filename: str = "", verbose: bool = False):
+    search_keywords = extract_search_keywords(user_query, filename)
+    if verbose:
+        st.write("🔍 Extracted keywords:", search_keywords)
+    
+    retrieved_docs = enhanced_retriever.hybrid_search(search_keywords, k=k, verbose=verbose)
+    
+    organized_text = organize_documents([doc for _, doc in retrieved_docs])
+    if verbose:
+        st.write("\n📝 Final Context for LLM:")
+        st.write(organized_text)
+    
+    answer = generate_answer(user_query, organized_text, filename)
+    return answer
+
+def get_cache_folders():
+    cache_dir = "./cache"
+    return [f for f in os.listdir(cache_dir) if f.endswith('.json')]
+
+def create_cache_key(files, custom_name=None):
+    """Create a unique cache key based on file contents and custom name if provided"""
+    # Get the names of all files, stripped of extensions
+    file_names = [os.path.splitext(file.name)[0] for file in files]
+    file_names.sort()  # Sort for consistency
+    
+    # Create a content-based hash that will be the same for the same files
+    files_info = []
+    for file in files:
+        content_hash = hash(file.getvalue())  # Hash of file content
+        file_info = f"{file.name}_{content_hash}"
+        files_info.append(file_info)
+    files_info.sort()  # Sort for consistency
+    content_hash = hash("_".join(files_info))
+    
+    # Use custom name if provided, otherwise create name from file names
+    if custom_name:
+        files_preview = custom_name
+    else:
+        if len(file_names) <= 3:
+            files_preview = "_".join(file_names)
+        else:
+            files_preview = f"{file_names[0]}_{file_names[1]}_and_{len(file_names)-2}_more"
+    
+    # Create final filename: readable prefix + content hash
+    return f"{files_preview}_{abs(content_hash)}.json"
+
+def process_uploaded_files(uploaded_files, custom_name=None):
+    """Process multiple uploaded files and return cache file name"""
+    output_folder = "./cache"
+    os.makedirs(output_folder, exist_ok=True)
+    
+    # Create a cache key based on the uploaded files
+    cache_file_name = create_cache_key(uploaded_files, custom_name)
+    cache_file_path = os.path.join(output_folder, cache_file_name)
+
+    # Check if these exact files have already been processed
+    if os.path.exists(cache_file_path):
+        st.info("These files have already been processed. Using existing cache.")
+        return cache_file_name
+
+    # Process the files if not in cache
+    with tempfile.TemporaryDirectory() as temp_dir:
+        # Save all uploaded files to temp directory
+        for uploaded_file in uploaded_files:
+            temp_file_path = os.path.join(temp_dir, uploaded_file.name)
+            with open(temp_file_path, "wb") as f:
+                f.write(uploaded_file.getvalue())
+        
+        # Process all PDFs in the temporary directory
+        strategy = "auto"
+        process_pdfs_and_cache(temp_dir, output_folder, strategy, cache_file_path)
+    
+    return cache_file_name
+
+# Add this to the existing functions
+def process_query(query, retriever, k, conversation_history, filename, verbose=False):
+    try:
+        context = "\n".join([f"User: {q}\nAI: {a}" for q, a in conversation_history])
+        full_query = f"Conversation history:\n{context}\n\nUser's new query: {query}"
+        return rag_query_enhanced(full_query, retriever, k=k, filename=filename, verbose=verbose)
+    except Exception as e:
+        st.error(f"Error processing query: {str(e)}")
+        return "I apologize, but I encountered an error processing your query. Please try again."
+@st.cache_resource
+def initialize_retriever_from_cache(cache_file_path):
+    with open(cache_file_path, 'r', encoding='utf-8') as f:
+        combined_content = json.load(f)
+    documents = process_data(combined_content)
+    embeddings = OpenAIEmbeddings(openai_api_key=st.secrets["OPENAI_API_KEY"])
+    vectorstore = FAISS.from_documents(documents, embeddings)
+    return EnhancedRetriever(vectorstore, documents)
+
+@st.cache_resource
+def initialize_retriever(folder_path):
+    strategy = "fast"
+    combined_content = process_pdfs_and_cache(folder_path, "./cache", strategy)
+    documents = process_data(combined_content)
+    embeddings = OpenAIEmbeddings()
+    vectorstore = FAISS.from_documents(documents, embeddings)
+    return EnhancedRetriever(vectorstore, documents)
+
+def export_conversation(conversation_history):
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    export_data = ""
+    for user_msg, ai_msg in conversation_history:
+        export_data += f"User: {user_msg}\n\nAssistant: {ai_msg}\n\n---\n\n"
+    return export_data, timestamp
+
+def trim_conversation_history(conversation_history, max_words=50000):
+    """Trim conversation history to stay under max_words limit"""
+    total_words = 0
+    # Count words from newest to oldest
+    for i in range(len(conversation_history) - 1, -1, -1):
+        user_msg, ai_msg = conversation_history[i]
+        words_in_exchange = len(user_msg.split()) + len(ai_msg.split())
+        total_words += words_in_exchange
+        
+        if total_words > max_words:
+            # Keep only the messages that fit within the limit
+            st.warning(f"Conversation history exceeded {max_words:,} words. Removing older messages to maintain performance.")
+            return conversation_history[i+1:]
+    
+    return conversation_history
+#########################################################
+
+
+
+
+
+## Visual Document Chat Assistant
+def analyze_pdf_conversation(pdf_data_list, conversation_history, new_question):
+    '''
+    Input: List of PDF data (base64), conversation history, and new question
+    Process: Maintains chat context while using prompt caching
+    Output: Streams Claude's response
+    '''
+    # Update client initialization with beta header for PDF support
+    client = anthropic.Anthropic(
+        api_key=st.secrets["ANTHROPIC_API_KEY"],
+        default_headers={
+            "anthropic-beta": "pdfs-2024-09-25"  # Add beta header for PDF support
+        }
+    )
+    
+    # Create PDF document content list with proper format
+    pdf_documents = [
+        {
+            "type": "document",
+            "source": {
+                "type": "base64",
+                "media_type": "application/pdf",
+                "data": pdf_data
+            },
+            "cache_control": {"type": "ephemeral"}  # Add cache control for better performance
+        }
+        for pdf_data in pdf_data_list
+    ]
+    
+    # Stream response from Claude
+    response = client.beta.messages.create(
+        model="claude-3-5-sonnet-20241022",
+        betas=["pdfs-2024-09-25", "prompt-caching-2024-07-31"],  # Add both betas
+        max_tokens=3000,
+        messages=[
+            # First message with PDFs - context setting
+            {
+                "role": "user",
+                "content": pdf_documents
+            },
+            # Previous conversation history - maintains context
+            *conversation_history,
+            # New question - current query
+            {
+                "role": "user",
+                "content": [{"type": "text", "text": new_question}]
+            }
+        ],
+        stream=True
+    )
+
+    # Stream each chunk directly
+    for chunk in response:
+        if chunk.type == "content_block_delta":
+            yield chunk.delta.text
+#########################################################
+
+
+
+
 
 #MAIN APP
 async def streamlit_main():
+    # Disable OpenAI request logging
+    logging.getLogger("openai").setLevel(logging.INFO)
+
     st.set_page_config(page_title="AI Assistant Tools", page_icon="🛠️", layout="wide")
 
-    st.title("AI Assistant Tools 🛠️")
-
-    tool_choice = st.sidebar.radio("Choose a tool:", (
+    # Remove category selection and show all tools directly
+    st.sidebar.header("Tools")
+    tool_choice = st.sidebar.radio("Choose a tool:", [
         "Home",
-        "Search Assistant",
-        "Job Description Assistant",
-        "Monthly Report Assistant",
         "BD Response Assistant",
-        "Prompt Engineering Assistant",
+        "Job Description Assistant", 
+        "Monthly Report Assistant",
+        "Document Chat Assistant",
+        "Visual Document Chat Assistant",
+        "Search Assistant",
         "Writing Assistant",
-        "Diagram Creation Assistant"
-    ))
+        "Diagram Creation Assistant",
+        "Prompt Engineering Assistant"
+    ])
 
     if tool_choice == "Home":
         st.markdown("""
-            This app provides various AI-powered assistants for internal use. 
+            Welcome! This app provides various AI-powered assistants for internal use. 
             Choose an assistant from the sidebar to get started.
 
-            **Please use responsibly:** avoid sharing sensitive or proprietary information, and your client policies should take priority. These tools are not approved for use with any classified or CUI/FOUO data and you should ask your manager before sharing any client data. If you have any questions about appropriate use please contact Matt Teschke.
+            ## Privacy Notice
+            - In this app, OpenAI will not look at conversations and deletes data after 30 days
+            - Chat histories are temporary and will be cleared when you close or refresh the page
 
-            **Note:** LLMs can make up information. You should treat responses as a starting point or draft and be sure to verify any information.
+            ## Usage Guidelines
+            - Not approved for use with CUI/FOUO or classified data
+            - Don't send personal info: email, phone number, DOB, address
+            - Don't use in hiring decisions (e.g. matching resumes to jobs)
+            - Each client has their own AI policies, so talk to your manager to discuss appropriate client use cases
+            - Use common sense and reach out if you have questions
+
+            ## Important Note
+            ⚠️ LLMs can make up information. You should treat responses as a starting point or draft and be sure to verify any information.
+
+            ## Feedback & Suggestions
+            We're constantly improving! Please reach out if you:
+            - Found a bug 🐛
+            - Have ideas for improvements ✨
+            - Want to request new features 🚀
+            - Have any questions or concerns ❓
+
+            **Contact:** Huy Nguyen on company Microsoft Teams
             """
         )
     elif tool_choice == "Prompt Engineering Assistant":
@@ -1048,7 +1518,7 @@ async def streamlit_main():
             with open("./example/example.txt", 'r') as file:
                 example_content = file.read()
 
-            model_choice = st.selectbox("Choose AI model:", ["gemini", "gpt4", "claude"])
+            model_choice = st.selectbox("Choose AI model:", ["gemini-flash", "gemini-pro", "gpt4", "claude"])
 
             if st.button("Generate Report") or st.session_state.report_content:
                 if not st.session_state.report_content:
@@ -1175,6 +1645,240 @@ async def streamlit_main():
         else:
             st.warning("Please enter a search query.")
 
+    elif tool_choice == "Document Chat Assistant":
+        st.header("Document Chat Assistant 📚")
+        
+        st.write("""
+        Welcome! This app allows you to have a conversation with your documents, especially those that are large and text-dense. Here's how to use it:
+        
+        1. **Upload Documents**: Use the file uploader below to add your PDF files
+        2. **Start Chatting**: Once processed, simply type your questions about the documents
+        3. **Get Answers**: The assistant will provide detailed responses based on your documents' text content
+        4. **Save Your Chat**: Remember to click 'Export Chat' to save your conversation - chats are not permanently stored!
+        
+        Already uploaded files will appear in the dropdown menu below. Choose one to start chatting!
+        """)
+        # Add warning about visual content limitations
+        st.warning("""
+            ⚠️ **Limitations**: 
+            - This assistant can handle large files but only processes text content, not visual content. 
+            - Conversations are temporary and will be deleted when you close or refresh the page.
+        """)
+
+        # Add model and parameter settings at the beginning
+        model_name = 'gpt-4o'
+        k = 4
+
+        # Add verbose toggle in sidebar
+        with st.sidebar:
+            verbose = st.toggle("Debug Mode (Verbose)", value=False)
+
+        # File upload section with custom name input
+        uploaded_files = st.file_uploader("Upload PDF files", type="pdf", accept_multiple_files=True)
+
+        if uploaded_files:
+            custom_name = st.text_input("Give these files a name (optional)", 
+                                      help="Enter a custom name for this set of files")
+            
+            process_button = st.button("Process Files")
+            if process_button:
+                with st.spinner("Processing uploaded PDFs... This may take a while."):
+                    try:
+                        cache_file_name = process_uploaded_files(uploaded_files, custom_name)
+                        st.success("PDFs processed successfully!")
+                        # Set the selected folder to the newly processed file
+                        st.session_state.rag_selected_folder = cache_file_name
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error processing PDFs: {str(e)}")
+                        return
+
+        # Get available folders
+        folder_options = get_cache_folders()
+        
+        if not folder_options:
+            st.error("No cached files found in the ./cache directory.")
+            return
+
+        # Initialize session states for RAG specifically
+        if 'rag_selected_folder' not in st.session_state:
+            default_file = "2025-benefits-docs_6220956148391947290.json"
+            st.session_state.rag_selected_folder = default_file if default_file in folder_options else folder_options[0]
+        if 'rag_conversation_history' not in st.session_state:
+            st.session_state.rag_conversation_history = []
+
+        # Add callback function for RAG folder selection
+        def on_rag_folder_change():
+            if st.session_state.rag_folder_selector != st.session_state.rag_selected_folder:
+                st.session_state.rag_selected_folder = st.session_state.rag_folder_selector
+                st.session_state.rag_conversation_history = []  # Reset only RAG conversation history
+
+        selected_folder = st.selectbox(
+            "Select file to chat with:", 
+            folder_options, 
+            key='rag_folder_selector',
+            index=folder_options.index(st.session_state.rag_selected_folder),
+            on_change=on_rag_folder_change
+        )
+
+        # Initialize the retriever with the selected cache file
+        cache_file_path = os.path.join("./cache", st.session_state.rag_selected_folder)
+        with st.spinner("Initializing system... This may take a while for large files, ~10s for 1000 pages."):
+            retriever = initialize_retriever_from_cache(cache_file_path)
+
+        # Process query
+        query = st.chat_input("Type your message here...")
+
+        # Display conversation history first
+        for user_msg, ai_msg in st.session_state.rag_conversation_history:
+            st.chat_message("user").write(user_msg)
+            st.chat_message("assistant").write(ai_msg)
+
+        if query:
+            # Display user message
+            with st.chat_message("user"):
+                st.write(query)
+            
+            # Display assistant's streaming response
+            with st.chat_message("assistant"):
+                message_placeholder = st.empty()
+                full_response = ""
+                display_filename = os.path.basename(st.session_state.rag_selected_folder).replace('.json', '')
+                for chunk in process_query(query, retriever, k, st.session_state.rag_conversation_history, filename=display_filename, verbose=verbose):
+                    full_response += chunk
+                    message_placeholder.markdown(full_response + "▌")
+            
+            # Add new message to history and trim if needed
+            st.session_state.rag_conversation_history.append((query, full_response))
+            st.session_state.rag_conversation_history = trim_conversation_history(
+                st.session_state.rag_conversation_history, 
+                max_words=50000
+            )
+
+        # Add word count display
+        if st.session_state.rag_conversation_history:
+            total_words = sum(len(msg.split()) + len(resp.split()) 
+                            for msg, resp in st.session_state.rag_conversation_history)
+            st.caption(f"Current conversation length: {total_words:,} words")
+
+        # Add New Chat button
+        if st.button("New Chat"):
+            st.session_state.rag_conversation_history = []
+            st.rerun()
+
+        # Export chat button
+        if st.session_state.rag_conversation_history:
+            col1, col2 = st.columns([1, 5])
+            with col1:
+                export_data, timestamp = export_conversation(st.session_state.rag_conversation_history)
+                st.download_button(
+                    label="Export Chat",
+                    data=export_data,
+                    file_name=f"conversation_{timestamp}.txt",
+                    mime="text/plain"
+                )
+
+    elif tool_choice == "Visual Document Chat Assistant":
+        st.header("Visual Document Chat Assistant 👁️")
+        
+        # Add instruction message
+        st.markdown("""
+        👁️ **Welcome to the Visual Document Chat Assistant!**
+        - This assistant can understand both text AND visual content (images, diagrams, charts)
+        - Perfect for analyzing documents containing visual information
+        - Limitation: The combined data size of uploaded PDFs should not exceed 31MB
+        
+        ⏳ **Note**: The first response may take a bit longer (10-20 seconds) as the system processes and analyzes your documents. 
+        Subsequent responses will be much faster!
+        """)
+
+        # Initialize session states
+        if "vdc_messages" not in st.session_state:
+            st.session_state.vdc_messages = []
+        if "vdc_pdf_data_list" not in st.session_state:
+            st.session_state.vdc_pdf_data_list = []
+
+        # # Add reset button in the sidebar
+        # if st.sidebar.button("Reset Chat"):
+        #     st.session_state.vdc_messages = []
+        #     st.rerun()
+
+        # File uploader with session state
+        uploaded_files = st.file_uploader(
+            "Upload your PDFs - Should be less than 31MB total", 
+            type="pdf", 
+            accept_multiple_files=True, 
+            help="Limit 31MB per file • PDF",
+            key="vdc_pdf_uploader"
+        )
+
+        if uploaded_files:
+            # Clear existing PDFs if new ones are uploaded
+            st.session_state.vdc_pdf_data_list = []
+            
+            for uploaded_file in uploaded_files:
+                # Check file size (31MB limit)
+                file_size = len(uploaded_file.read())
+                uploaded_file.seek(0)  # Reset file pointer
+                
+                if file_size > 31 * 1024 * 1024:
+                    st.error(f"File '{uploaded_file.name}' exceeds 31MB limit. This file will be skipped.")
+                else:
+                    # Add PDF data to session state list
+                    pdf_data = base64.b64encode(uploaded_file.read()).decode("utf-8")
+                    st.session_state.vdc_pdf_data_list.append(pdf_data)
+            
+            if st.session_state.vdc_pdf_data_list:
+                st.success(f"Successfully loaded {len(st.session_state.vdc_pdf_data_list)} PDF(s)")
+
+        # Show chat interface if we have PDF data
+        if st.session_state.vdc_pdf_data_list:
+            # Display chat messages
+            for message in st.session_state.vdc_messages:
+                with st.chat_message(message["role"]):
+                    st.write(message["content"])
+
+            # Chat input
+            if prompt := st.chat_input("Ask a question about your PDFs"):
+                # Display user message
+                with st.chat_message("user"):
+                    st.write(prompt)
+
+                # Add user message to chat history
+                st.session_state.vdc_messages.append({"role": "user", "content": prompt})
+
+                # Get AI response
+                try:
+                    # Display assistant's streaming response
+                    with st.chat_message("assistant"):
+                        message_placeholder = st.empty()
+                        full_response = ""
+                        for chunk in analyze_pdf_conversation(
+                            st.session_state.vdc_pdf_data_list,
+                            st.session_state.vdc_messages[:-1],
+                            prompt
+                        ):
+                            full_response += chunk
+                            message_placeholder.markdown(full_response + "▌")
+                        message_placeholder.markdown(full_response)  # Final update without cursor
+                    
+                    # Add to conversation history after complete
+                    st.session_state.vdc_messages.append({"role": "assistant", "content": full_response})
+                    
+                except Exception as e:
+                    st.error(f"Error: {e}")
+                    # Add reset button at the bottom of conversation
+            if st.session_state.vdc_messages:  # Only show reset button if there are messages
+                if st.button("Reset Chat"):
+                    st.session_state.vdc_messages = []
+                    st.rerun()
+        else:
+            st.info("Please upload one or more PDF files to start chatting!")
+
 
 if __name__ == "__main__":
     asyncio.run(streamlit_main())
+
+def check_file_size(file_content):
+    size_mb = len(file_content) / (1024 * 1024)
+    return size_mb <= 31  # Claude's current PDF size limit

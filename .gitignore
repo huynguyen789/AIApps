@@ -6,3 +6,6 @@ venv/
 venv/
 venv/pyvenv.cfg
 docs/MSR/
+
+#ignore .cfg files
+*.cfg

@@ -116,40 +116,44 @@ def setup_gemini(model_variant: str = "flash"):
 def get_model(model_name: str):
     """
     Input: model_name string
-    Process: Maps model name to appropriate client/setup function
-    Output: Model client or instance
+    Process: Returns appropriate model client based on name
+    Output: Model client instance
     """
-    # Define available models and their setup functions
-    model_map = {
-        "gemini-flash": lambda: setup_gemini("flash"),
-        "gemini-pro": lambda: setup_gemini("pro"),
-        "claude": lambda: anthropic_client,
-        "gpt4": lambda: openai_client,
-    }
-    
-    # Validate model name
-    if model_name not in model_map:
-        available_models = ", ".join(model_map.keys())
+    if model_name == "gemini-flash":
+        genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
+        return genai.GenerativeModel('gemini-1.5-flash-002')
+    elif model_name == "gemini-pro":
+        genai.configure(api_key=st.secrets["GOOGLE_API_KEY"])
+        return genai.GenerativeModel('gemini-1.5-pro-002')
+    elif model_name == "claude":
+        return Anthropic(api_key=st.secrets["ANTHROPIC_API_KEY"])
+    elif model_name == "gpt4" or "gpt4o":
+        return OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+    else:
+        available_models = "gemini-flash, gemini-pro, claude, gpt4"
         raise ValueError(f"Unsupported model: {model_name}. Available models: {available_models}")
-    
-    try:
-        # Get and return the model instance
-        return model_map[model_name]()
-    except Exception as e:
-        raise RuntimeError(f"Error initializing model {model_name}: {str(e)}")
+
 
 # Usage in Streamlit UI
-def render_model_selector():
+def render_model_selector(default_model="gemini-flash"):
     """
-    Input: None
-    Process: Creates model selection dropdown
+    Input: default_model (str) - model to be selected by default
+    Process: Creates model selection dropdown with specified default
     Output: Selected model name
+    Logic: Uses index of default model in available models list
     """
-    available_models = ["gemini-flash", "gemini-pro", "sonnet3.5", "gpt4o"]
+    available_models = ["gemini-flash", "gemini-pro", "claude", "gpt4o"]
+    try:
+        default_index = available_models.index(default_model)
+    except ValueError:
+        default_index = 0  # Fallback to first model if default_model is invalid
+        st.warning(f"Invalid default model '{default_model}'. Using {available_models[0]}")
+    
     return st.selectbox(
         "Choose AI model:",
         options=available_models,
-        key="model_selector"
+        key="model_selector",
+        index=default_index
     )
     
 
@@ -1339,65 +1343,11 @@ Focus on delivering the most important information in a concise format.""",
 - First give a short concise answer. Then give a detail answer. 
 Focus on making the content easy to understand while preserving accuracy."""
     }
-def generate_response_sync(model_name: str, prompt: str, conversation_history: list, system_prompt: Optional[str] = None):
-    """
-    Input: model_name, prompt, conversation_history, optional system_prompt
-    Process: Generates streaming response with full conversation context
-    Output: Yields response chunks
-    Logic: Maintains conversation history for context
-    """
-    model = get_model(model_name)
-    
-    # Prepare messages with system prompt and conversation history
-    messages = []
-    if system_prompt:
-        messages.append({"role": "system", "content": system_prompt})
-    messages.extend(conversation_history)
-    messages.append({"role": "user", "content": prompt})
-    
-    if model_name.startswith('gemini'):  # Gemini models
-        # Format conversation history for Gemini
-        formatted_history = "\n".join([
-            f"{'Assistant' if msg['role'] == 'assistant' else 'User'}: {msg['content']}"
-            for msg in conversation_history
-        ])
-        full_prompt = f"{system_prompt}\n\nConversation History:\n{formatted_history}\n\nUser: {prompt}"
-        
-        response = model.generate_content(full_prompt, stream=True)
-        for chunk in response:
-            if chunk.text:
-                yield chunk.text
-                
-    elif model_name == 'claude':  # Claude
-        client = Anthropic(api_key=st.secrets["ANTHROPIC_API_KEY"])
-        response = client.messages.create(
-            model="claude-3-5-sonnet-20241022",
-            max_tokens=4096,
-            temperature=0,
-            messages=messages,
-            stream=True
-        )
-        for chunk in response:
-            if chunk.delta.text:
-                yield chunk.delta.text
-                
-    elif model_name.startswith('gpt'):  # GPT-4
-        client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
-        stream = client.chat.completions.create(
-            model="gpt-4o",
-            messages=messages,
-            max_tokens=4096,
-            temperature=0,
-            stream=True
-        )
-        for chunk in stream:
-            if chunk.choices[0].delta.content is not None:
-                yield chunk.choices[0].delta.content
 
 def basic_chat():
     """
     Input: None
-    Process: Creates chat interface with model and persona selection
+    Process: Creates chat interface with model and persona selection at the top
     Output: Displays chat interface and handles message streaming
     Logic: Uses session state for history, applies selected persona
     """
@@ -1407,27 +1357,23 @@ def basic_chat():
     if 'messages' not in st.session_state:
         st.session_state.messages = []
     if 'selected_persona' not in st.session_state:
-        st.session_state.selected_persona = "Default Assistant"  # Changed default
+        st.session_state.selected_persona = "Default Assistant"
+
+    # Move model and persona selectors to the top
+    col1, col2 = st.columns(2)
     
-    # Sidebar controls
-    with st.sidebar:
-        # Model selector
-        st.divider()
-        model_choice = render_model_selector()
-        
+    with col1:
+        model_choice = render_model_selector(default_model="gpt4o")
+    
+    with col2:
         # Persona selector
         personas = get_writing_personas()
         selected_persona = st.selectbox(
             "Select Assistant Persona:",
             options=list(personas.keys()),
-            index=0,  # Default Assistant will be first in the list
-            help="Choose how you want the AI to behave. 'Default Assistant' is a general-purpose helper."
+            index=0,
+            help="Choose how you want the AI to behave"
         )
-        
-        
-        # # Show current persona's description
-        # st.caption("Current Persona Description:")
-        # st.markdown(personas[selected_persona].split('\n'))  # Show first line of persona description
         
         # Update persona if changed
         if selected_persona != st.session_state.selected_persona:
@@ -1435,14 +1381,17 @@ def basic_chat():
                 if st.checkbox("Keep chat history when changing persona?", value=False):
                     st.session_state.selected_persona = selected_persona
                 else:
-                    st.session_state.messages = []  # Clear chat
+                    st.session_state.messages = []
                     st.session_state.selected_persona = selected_persona
                     st.rerun()
             else:
                 st.session_state.selected_persona = selected_persona
-        
-        # Chat controls
-        # st.divider()
+    
+    # # Display current persona as a small badge
+    # st.caption(f"🎭 {st.session_state.selected_persona}")
+    
+    # Move chat controls to sidebar
+    with st.sidebar:
         col1, col2 = st.columns(2)
         with col1:
             if st.button("Clear Chat"):
@@ -1462,8 +1411,7 @@ def basic_chat():
                     mime="text/plain"
                 )
     
-    # Display current persona as a small badge
-    st.caption(f"🎭 {st.session_state.selected_persona}")
+
     
     # Display chat history
     for message in st.session_state.messages:
@@ -1498,6 +1446,130 @@ def basic_chat():
         
         # Add assistant response to history
         st.session_state.messages.append({"role": "assistant", "content": full_response})
+
+def get_current_time():
+    """Get current time in readable format"""
+    current_time = datetime.now()
+    return current_time.strftime("%I:%M %p, %B %d, %Y")
+
+
+def generate_response_sync(model_name: str, prompt: str, conversation_history: list, system_prompt: Optional[str] = None):
+    """
+    Input: model_name, prompt, conversation_history, optional system_prompt
+    Process: Generates streaming response with function calling support
+    Output: Yields response chunks and function call results
+    """
+    client = get_model(model_name)
+    
+    # Prepare messages
+    messages = []
+    if system_prompt:
+        messages.append({"role": "system", "content": system_prompt})
+    messages.extend(conversation_history)
+    messages.append({"role": "user", "content": prompt})
+    
+    if model_name.startswith('gemini'):  # Gemini models
+        formatted_history = "\n".join([
+            f"{'Assistant' if msg['role'] == 'assistant' else 'User'}: {msg['content']}"
+            for msg in conversation_history
+        ])
+        full_prompt = f"{system_prompt}\n\nConversation History:\n{formatted_history}\n\nUser: {prompt}"
+        
+        response = client.generate_content(full_prompt, stream=True)
+        for chunk in response:
+            if chunk.text:
+                yield chunk.text
+                
+    elif model_name == 'claude':  # Claude
+        response = client.messages.create(
+            model="claude-3-5-sonnet-20241022",
+            max_tokens=4096,
+            temperature=0,
+            messages=messages,
+            stream=True
+        )
+        for chunk in response:
+            if chunk.delta.text:
+                yield chunk.delta.text
+                
+    elif model_name == 'gpt4' or "gpt4o":  # GPT-4
+        # Define tools
+        tools = [
+            {
+                "type": "function",
+                "function": {
+                    "name": "get_current_time",
+                    "description": "Get the current time in various formats including ISO, readable, and unix timestamp",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {},
+                        "required": []
+                    }
+                }
+            }
+        ]
+
+        # First API call with function calling enabled
+        response = client.chat.completions.create(
+            model="gpt-4o",  # Updated model name
+            messages=messages,
+            tools=tools,
+            tool_choice="auto",
+            stream=False  # First call without streaming to handle function calls
+        )
+
+        # Check if the model wants to call a function
+        if response.choices[0].finish_reason == "tool_calls":
+            tool_call = response.choices[0].message.tool_calls[0]
+            
+            # Log which tool is being called and add to message history
+            st.write(f"🔧 Using tool: {tool_call.function.name}")
+            messages.append({
+                "role": "assistant",
+                "content": f"🔧 Using tool: {tool_call.function.name}"
+            })
+            
+            # Call the get_current_time function
+            if tool_call.function.name == "get_current_time":
+                function_response = get_current_time()
+                # Show the function result
+                st.write(f"Tool use result: {function_response}")
+                
+                # Append the function response to messages
+                messages.append({
+                    "role": "function", 
+                    "name": "get_current_time",
+                    "content": f"Tool use result: {function_response}"
+                })
+                
+                # Make a second API call to get the final response
+                second_response = client.chat.completions.create(
+                    model="gpt-4o",  # Updated model name
+                    messages=messages,
+                    stream=True  # Stream the final response
+                )
+                
+                # Stream the final response
+                for chunk in second_response:
+                    if chunk.choices[0].delta.content:
+                        yield chunk.choices[0].delta.content
+        else:
+            # If no function call, stream the initial response
+            stream = client.chat.completions.create(
+                model="gpt-4o",  # Updated model name
+                messages=messages,
+                stream=True
+            )
+            
+            for chunk in stream:
+                if chunk.choices[0].delta.content:
+                    yield chunk.choices[0].delta.content
+
+
+
+
+
+
 
 
 #MAIN APP

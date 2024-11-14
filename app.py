@@ -1410,7 +1410,31 @@ def basic_chat():
                     file_name=f"chat_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
                     mime="text/plain"
                 )
-    
+                
+        # Display chat history with Mermaid support
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            content = message["content"]
+            
+            # Check for Mermaid diagram in the content
+            if "```mermaid" in content:
+                # Split content and render each part appropriately
+                parts = content.split("```")
+                for i, part in enumerate(parts):
+                    if part.startswith("mermaid\n"):
+                        # Render Mermaid diagram
+                        mermaid_code = part.replace("mermaid\n", "").strip()
+                        try:
+                            stmd.st_mermaid(mermaid_code, height=400)
+                        except Exception as e:
+                            st.error(f"Error rendering diagram: {str(e)}")
+                            st.code(mermaid_code, language="mermaid")
+                    elif part.strip():
+                        # Render regular text
+                        st.markdown(part)
+            else:
+                # Regular markdown rendering
+                st.markdown(content)
 
     
     # Display chat history
@@ -1451,6 +1475,29 @@ def get_current_time():
     """Get current time in readable format"""
     current_time = datetime.now()
     return current_time.strftime("%I:%M %p, %B %d, %Y")
+def generate_mermaid_diagram_sync(description):
+    """
+    Input: Text description of desired diagram
+    Process: Uses Claude to generate Mermaid diagram code synchronously
+    Output: Returns Mermaid diagram code as string
+    """
+    prompt = """
+    You are an expert in creating Mermaid diagrams. Based on the user's description, generate a Mermaid diagram code.
+    Make sure the code is valid and follows Mermaid syntax. Return only the Mermaid code, without any additional text or explanations, tags, or code block markers.
+    If the chart getting weirdly too long, make sure to design it so it fit nicely in user monitor(not super long that they have to scroll too much).
+    Only return the code, no mermaid tag. 
+    """
+    
+    response = client.chat.completions.create(
+        model="gpt-4o",
+        messages=[
+            {"role": "system", "content": prompt},
+            {"role": "user", "content": f"Create a Mermaid diagram for: {description}"}
+        ],
+        temperature=0
+    )
+    
+    return response.choices[0].message.content.strip()
 
 
 def generate_response_sync(model_name: str, prompt: str, conversation_history: list, system_prompt: Optional[str] = None):
@@ -1493,70 +1540,88 @@ def generate_response_sync(model_name: str, prompt: str, conversation_history: l
                 yield chunk.delta.text
                 
     elif model_name == 'gpt4' or "gpt4o":  # GPT-4
-        # Define tools
         tools = [
             {
                 "type": "function",
                 "function": {
                     "name": "get_current_time",
-                    "description": "Get the current time in various formats including ISO, readable, and unix timestamp",
+                    "description": "Get the current time in various formats",
                     "parameters": {
                         "type": "object",
                         "properties": {},
                         "required": []
                     }
                 }
+            },
+            {
+                "type": "function",
+                "function": {
+                    "name": "create_mermaid_diagram",
+                    "description": "Generate a Mermaid diagram from a text description. Use this when user asks for diagrams, flowcharts, or visual representations.",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "description": {
+                                "type": "string",
+                                "description": "Description of the diagram to create"
+                            }
+                        },
+                        "required": ["description"]
+                    }
+                }
             }
         ]
 
-        # First API call with function calling enabled
         response = client.chat.completions.create(
-            model="gpt-4o",  # Updated model name
+            model="gpt-4o",
             messages=messages,
             tools=tools,
             tool_choice="auto",
-            stream=False  # First call without streaming to handle function calls
+            stream=False
         )
 
-        # Check if the model wants to call a function
-        if response.choices[0].finish_reason == "tool_calls":
+        if response.choices[0].message.tool_calls:
             tool_call = response.choices[0].message.tool_calls[0]
+            function_name = tool_call.function.name
+            function_args = json.loads(tool_call.function.arguments)
             
-            # Log which tool is being called and add to message history
-            st.write(f"🔧 Using tool: {tool_call.function.name}")
+            # Display tool usage messages first
+            yield f"\nUsing tool: {function_name}\n"
+            
+            if function_name == "get_current_time":
+                function_response = get_current_time()
+                yield f"\nTool use result: {function_response}\n\n"
+                
+            elif function_name == "create_mermaid_diagram":
+                description = function_args.get("description", "")
+                yield f"\nTool use result: Generating diagram for: {description}\n\n"
+                # yield "```mermaid\n"
+                diagram_code = generate_mermaid_diagram_sync(description)
+                # yield f"{diagram_code}\n```\n\n"
+                function_response = diagram_code
+                stmd.st_mermaid(function_response, height=800)
+            
+            # Add function result to messages
             messages.append({
-                "role": "assistant",
-                "content": f"🔧 Using tool: {tool_call.function.name}"
+                "role": "function",
+                "name": function_name,
+                "content": function_response
             })
             
-            # Call the get_current_time function
-            if tool_call.function.name == "get_current_time":
-                function_response = get_current_time()
-                # Show the function result
-                st.write(f"Tool use result: {function_response}")
-                
-                # Append the function response to messages
-                messages.append({
-                    "role": "function", 
-                    "name": "get_current_time",
-                    "content": f"Tool use result: {function_response}"
-                })
-                
-                # Make a second API call to get the final response
-                second_response = client.chat.completions.create(
-                    model="gpt-4o",  # Updated model name
-                    messages=messages,
-                    stream=True  # Stream the final response
-                )
-                
-                # Stream the final response
-                for chunk in second_response:
-                    if chunk.choices[0].delta.content:
-                        yield chunk.choices[0].delta.content
-        else:
-            # If no function call, stream the initial response
+            # Get final response
             stream = client.chat.completions.create(
-                model="gpt-4o",  # Updated model name
+                model="gpt-4o",
+                messages=messages,
+                stream=True
+            )
+            
+          
+            for chunk in stream:
+                if chunk.choices[0].delta.content:
+                    yield chunk.choices[0].delta.content
+        else:
+            stream = client.chat.completions.create(
+                model="gpt-4o",
                 messages=messages,
                 stream=True
             )
@@ -1858,6 +1923,7 @@ async def streamlit_main():
             st.session_state.diagram_description = ""
             st.session_state.mermaid_code = ""
             st.rerun()
+    
     elif tool_choice == "Monthly Report Assistant":
         st.header("Monthly Report Assistant 📊")
         st.write("""

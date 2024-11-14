@@ -5,6 +5,7 @@ import json
 import re
 from openai import AsyncOpenAI
 from anthropic import AsyncAnthropic
+from anthropic import Anthropic
 import streamlit_mermaid as stmd
 import base64
 import requests
@@ -188,6 +189,22 @@ async def generate_response(model_name: str, prompt: str, system_prompt: Optiona
             stream=True
         )
         async for chunk in stream:
+            if chunk.choices[0].delta.content is not None:
+                yield chunk.choices[0].delta.content
+
+
+        messages = [{"role": "user", "content": prompt}]
+        if system_prompt:
+            messages.insert(0, {"role": "system", "content": system_prompt})
+            
+        stream = model.chat.completions.create(
+            model="gpt-4o",
+            messages=messages,
+            max_tokens=4096,
+            temperature=0,
+            stream=True
+        )
+        for chunk in stream:
             if chunk.choices[0].delta.content is not None:
                 yield chunk.choices[0].delta.content
 #########################################################
@@ -403,7 +420,7 @@ async def generate_mermaid_diagram(description):
     prompt = """
     You are an expert in creating Mermaid diagrams. Based on the user's description, generate a Mermaid diagram code.
     Make sure the code is valid and follows Mermaid syntax. Return only the Mermaid code, without any additional text or explanations, tags, or code block markers.
-    Try to design the code to fit nicely in horizontal monitor for user.
+    If the chart getting weirdly too long, make sure to design it so it fit nicely in user monitor(not super long that they have to scroll too much)
     
 
     
@@ -1162,7 +1179,7 @@ def process_uploaded_files(uploaded_files, custom_name=None):
     
     return cache_file_name
 
-# Add this to the existing functions
+
 def process_query(query, retriever, k, conversation_history, filename, verbose=False):
     try:
         context = "\n".join([f"User: {q}\nAI: {a}" for q, a in conversation_history])
@@ -1215,28 +1232,7 @@ def trim_conversation_history(conversation_history, max_words=50000):
 
 
 
-# Modify the main function to include password check
-async def streamlit_main():
-    # Disable OpenAI request logging
-    logging.getLogger("openai").setLevel(logging.INFO)
-
-    st.set_page_config(page_title="AI Assistant Tools", page_icon="🛠️", layout="wide")
-
-    # Check password before showing content
-    if not check_password():
-        st.stop()  # Do not continue if password check fails
-        
-    # Rest of your existing main code...
-    st.sidebar.header("Tools")
-    tool_choice = st.sidebar.radio("Choose a tool:", [
-        "Home",
-        "BD Response Assistant",
-        "Job Description Assistant",
-        # ... rest of your tools
-    ])
-    
-    # Your existing tool logic...
-## Visual Document Chat Assistant
+#visualiza chat
 def check_file_size(file_content):
     size_mb = len(file_content) / (1024 * 1024)
     return size_mb <= 31  # Claude's current PDF size limit 
@@ -1299,6 +1295,184 @@ def analyze_pdf_conversation(pdf_data_list, conversation_history, new_question):
 
 
 
+#CHAT APP:
+def get_writing_personas():
+    """
+    Input: None
+    Process: Defines different writing assistant personas
+    Output: Dictionary of persona names and their system prompts
+    """
+    return {
+        "Professional Writer": """You are a professional writer and editor. Your expertise includes:
+- Enhancing clarity and professionalism in writing
+- Maintaining consistent tone and style
+- Ensuring proper grammar and punctuation
+- Restructuring content for better flow
+Focus on making the text clear, concise, and impactful while maintaining the original message.""",
+        
+        "Grammar Expert": """You are a world-class grammar and language expert. Your focus is on:
+- Correcting grammatical errors
+- Improving sentence structure
+- Ensuring proper punctuation
+- Maintaining consistency in tense and voice
+Provide clear explanations for your corrections to help users understand the rules.""",
+        
+        "Summarizer": """You are an expert in content summarization. Your skills include:
+- Identifying key points and main ideas
+- Condensing lengthy content while maintaining meaning
+- Creating clear and concise summaries
+- Organizing information hierarchically
+Focus on delivering the most important information in a concise format.""",
+        
+        "Explainer": """You are an expert at explaining complex topics. Your approach includes:
+- Breaking down complex ideas into simple terms
+- Using analogies and examples
+- Providing clear step-by-step explanations
+- Maintaining accessibility for all audience levels
+Focus on making the content easy to understand while preserving accuracy."""
+    }
+def generate_response_sync(model_name: str, prompt: str, conversation_history: list, system_prompt: Optional[str] = None):
+    """
+    Input: model_name, prompt, conversation_history, optional system_prompt
+    Process: Generates streaming response with full conversation context
+    Output: Yields response chunks
+    Logic: Maintains conversation history for context
+    """
+    model = get_model(model_name)
+    
+    # Prepare messages with system prompt and conversation history
+    messages = []
+    if system_prompt:
+        messages.append({"role": "system", "content": system_prompt})
+    messages.extend(conversation_history)
+    messages.append({"role": "user", "content": prompt})
+    
+    if model_name.startswith('gemini'):  # Gemini models
+        # Format conversation history for Gemini
+        formatted_history = "\n".join([
+            f"{'Assistant' if msg['role'] == 'assistant' else 'User'}: {msg['content']}"
+            for msg in conversation_history
+        ])
+        full_prompt = f"{system_prompt}\n\nConversation History:\n{formatted_history}\n\nUser: {prompt}"
+        
+        response = model.generate_content(full_prompt, stream=True)
+        for chunk in response:
+            if chunk.text:
+                yield chunk.text
+                
+    elif model_name == 'claude':  # Claude
+        client = Anthropic(api_key=st.secrets["ANTHROPIC_API_KEY"])
+        response = client.messages.create(
+            model="claude-3-5-sonnet-20241022",
+            max_tokens=4096,
+            temperature=0,
+            messages=messages,
+            stream=True
+        )
+        for chunk in response:
+            if chunk.delta.text:
+                yield chunk.delta.text
+                
+    elif model_name.startswith('gpt'):  # GPT-4
+        client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+        stream = client.chat.completions.create(
+            model="gpt-4o",
+            messages=messages,
+            max_tokens=4096,
+            temperature=0,
+            stream=True
+        )
+        for chunk in stream:
+            if chunk.choices[0].delta.content is not None:
+                yield chunk.choices[0].delta.content
+
+def basic_chat():
+    """
+    Input: None
+    Process: Creates chat interface with model and persona selection
+    Output: Displays chat interface and handles message streaming
+    Logic: Uses session state for history, applies selected persona
+    """
+    st.header("AI Chat Assistant 💬")
+    
+    # Initialize session states
+    if 'messages' not in st.session_state:
+        st.session_state.messages = []
+    if 'selected_persona' not in st.session_state:
+        st.session_state.selected_persona = "Professional Writer"
+    
+    # Sidebar controls
+    with st.sidebar:
+        # Model selector
+        model_choice = render_model_selector()
+        
+        # Persona selector
+        personas = get_writing_personas()
+        selected_persona = st.selectbox(
+            "Select Assistant Persona:",
+            options=list(personas.keys()),
+            index=list(personas.keys()).index(st.session_state.selected_persona)
+        )
+        
+        # Update persona if changed
+        if selected_persona != st.session_state.selected_persona:
+            st.session_state.selected_persona = selected_persona
+            st.session_state.messages = []  # Clear chat when persona changes
+            st.rerun()
+        
+        # Chat controls
+        if st.button("Clear Chat"):
+            st.session_state.messages = []
+            st.rerun()
+        
+        if st.session_state.messages:
+            export_data = "\n\n".join([
+                f"{msg['role'].title()}: {msg['content']}"
+                for msg in st.session_state.messages
+            ])
+            st.download_button(
+                "Export Chat",
+                export_data,
+                file_name=f"chat_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
+                mime="text/plain"
+            )
+    
+    # Display current persona
+    st.caption(f"Current Persona: {st.session_state.selected_persona}")
+    
+    # Display chat history
+    for message in st.session_state.messages:
+        with st.chat_message(message["role"]):
+            st.markdown(message["content"])
+    
+    # Chat input
+    if prompt := st.chat_input("What's on your mind?"):
+        # Add user message
+        st.session_state.messages.append({"role": "user", "content": prompt})
+        with st.chat_message("user"):
+            st.markdown(prompt)
+        
+        # Get system prompt for current persona
+        system_prompt = personas[st.session_state.selected_persona]
+        
+        # Display assistant response
+        with st.chat_message("assistant"):
+            message_placeholder = st.empty()
+            full_response = ""
+            
+            # Generate response with full conversation history
+            for chunk in generate_response_sync(
+                model_choice,
+                prompt,
+                conversation_history=st.session_state.messages[:-1],  # Exclude current prompt
+                system_prompt=system_prompt
+            ):
+                full_response += chunk
+                message_placeholder.markdown(full_response + "▌")
+            message_placeholder.markdown(full_response)
+        
+        # Add assistant response to history
+        st.session_state.messages.append({"role": "assistant", "content": full_response})
 
 
 #MAIN APP
@@ -1316,6 +1490,7 @@ async def streamlit_main():
     st.sidebar.header("Tools")
     tool_choice = st.sidebar.radio("Choose a tool:", [
         "Home",
+        "Chat Assistant",
         "BD Response Assistant",
         "Job Description Assistant", 
         "Monthly Report Assistant",
@@ -1973,7 +2148,8 @@ async def streamlit_main():
         else:
             st.info("Please upload one or more PDF files to start chatting!")
 
-
+    if tool_choice == "Chat Assistant":
+        basic_chat()
 if __name__ == "__main__":
     asyncio.run(streamlit_main())
 

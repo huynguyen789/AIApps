@@ -145,7 +145,7 @@ def render_model_selector():
     Process: Creates model selection dropdown
     Output: Selected model name
     """
-    available_models = ["gemini-flash", "gemini-pro", "claude", "gpt4"]
+    available_models = ["gemini-flash", "gemini-pro", "sonnet3.5", "gpt4o"]
     return st.selectbox(
         "Choose AI model:",
         options=available_models,
@@ -1303,6 +1303,13 @@ def get_writing_personas():
     Output: Dictionary of persona names and their system prompts
     """
     return {
+        "Default Assistant": """You are a helpful, friendly, and knowledgeable AI assistant. Your approach includes:
+- Providing clear and accurate information
+- Being conversational and engaging
+- Maintaining a helpful and professional tone
+- Asking clarifying questions when needed
+Focus on being helpful while maintaining a natural conversation flow.""",
+        
         "Professional Writer": """You are a professional writer and editor. Your expertise includes:
 - Enhancing clarity and professionalism in writing
 - Maintaining consistent tone and style
@@ -1329,6 +1336,7 @@ Focus on delivering the most important information in a concise format.""",
 - Using analogies and examples
 - Providing clear step-by-step explanations
 - Maintaining accessibility for all audience levels
+- First give a short concise answer. Then give a detail answer. 
 Focus on making the content easy to understand while preserving accuracy."""
     }
 def generate_response_sync(model_name: str, prompt: str, conversation_history: list, system_prompt: Optional[str] = None):
@@ -1399,11 +1407,12 @@ def basic_chat():
     if 'messages' not in st.session_state:
         st.session_state.messages = []
     if 'selected_persona' not in st.session_state:
-        st.session_state.selected_persona = "Professional Writer"
+        st.session_state.selected_persona = "Default Assistant"  # Changed default
     
     # Sidebar controls
     with st.sidebar:
         # Model selector
+        st.divider()
         model_choice = render_model_selector()
         
         # Persona selector
@@ -1411,34 +1420,50 @@ def basic_chat():
         selected_persona = st.selectbox(
             "Select Assistant Persona:",
             options=list(personas.keys()),
-            index=list(personas.keys()).index(st.session_state.selected_persona)
+            index=0,  # Default Assistant will be first in the list
+            help="Choose how you want the AI to behave. 'Default Assistant' is a general-purpose helper."
         )
+        
+        
+        # # Show current persona's description
+        # st.caption("Current Persona Description:")
+        # st.markdown(personas[selected_persona].split('\n'))  # Show first line of persona description
         
         # Update persona if changed
         if selected_persona != st.session_state.selected_persona:
-            st.session_state.selected_persona = selected_persona
-            st.session_state.messages = []  # Clear chat when persona changes
-            st.rerun()
+            if st.session_state.messages:  # Only show warning if there are messages
+                if st.checkbox("Keep chat history when changing persona?", value=False):
+                    st.session_state.selected_persona = selected_persona
+                else:
+                    st.session_state.messages = []  # Clear chat
+                    st.session_state.selected_persona = selected_persona
+                    st.rerun()
+            else:
+                st.session_state.selected_persona = selected_persona
         
         # Chat controls
-        if st.button("Clear Chat"):
-            st.session_state.messages = []
-            st.rerun()
+        # st.divider()
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("Clear Chat"):
+                st.session_state.messages = []
+                st.rerun()
         
-        if st.session_state.messages:
-            export_data = "\n\n".join([
-                f"{msg['role'].title()}: {msg['content']}"
-                for msg in st.session_state.messages
-            ])
-            st.download_button(
-                "Export Chat",
-                export_data,
-                file_name=f"chat_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
-                mime="text/plain"
-            )
+        with col2:
+            if st.session_state.messages:
+                export_data = "\n\n".join([
+                    f"{msg['role'].title()}: {msg['content']}"
+                    for msg in st.session_state.messages
+                ])
+                st.download_button(
+                    "Export Chat",
+                    export_data,
+                    file_name=f"chat_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
+                    mime="text/plain"
+                )
     
-    # Display current persona
-    st.caption(f"Current Persona: {st.session_state.selected_persona}")
+    # Display current persona as a small badge
+    st.caption(f"🎭 {st.session_state.selected_persona}")
     
     # Display chat history
     for message in st.session_state.messages:

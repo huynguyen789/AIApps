@@ -1153,71 +1153,24 @@ def check_file_size(file_content):
     size_mb = len(file_content) / (1024 * 1024)
     return size_mb <= 31  # Claude's current PDF size limit 
 
-def analyze_pdf_conversation(pdf_data_list, conversation_history, new_question):
+def analyze_pdf_conversation(messages):
     '''
-    Input: List of PDF data (base64), conversation history, and new question
-    Process: Maintains chat context while using prompt caching
+    Input: List of properly formatted messages including PDFs and conversation
     Output: Streams Claude's response
     '''
-    # Update client initialization with beta header for PDF support
     client = anthropic.Anthropic(
         api_key=st.secrets["ANTHROPIC_API_KEY"],
-        default_headers={
-            "anthropic-beta": "pdfs-2024-09-25"  # Add beta header for PDF support
-        }
+        default_headers={"anthropic-beta": "pdfs-2024-09-25"}
     )
     
-    # Create PDF document content list with proper format
-    pdf_documents = [
-        {
-            "type": "document",
-            "source": {
-                "type": "base64",
-                "media_type": "application/pdf",
-                "data": pdf_data
-            },
-            "cache_control": {"type": "ephemeral"}  # Add cache control for better performance
-        }
-        for pdf_data in pdf_data_list
-    ]
-    
-    #System prompt:
-    sys_prompt = """<instruction> You are a a world class RAG assistant. Your task is to answer questions based on the provided documents.
-    
-    - Focus on providing clear and accurate information. If something you are not sure or dont have info, state it.
-    - Asking clarifying questions to give a better answer if needed
-    - Always provide citation for information you use from the provided documents
-    - If the info refers to a different section, state it.
-    </instruction>
-    """
-    
-    # Stream response from Claude
     response = client.beta.messages.create(
         model="claude-3-5-sonnet-20241022",
-        betas=["pdfs-2024-09-25", "prompt-caching-2024-07-31"],  # Add both betas
+        messages=messages,
         max_tokens=3000,
-        messages=[
-            # First message with PDFs - context setting
-            {
-                "role": "user",
-                "content": pdf_documents
-            },
-                        {
-                "role": "user",
-                "content": sys_prompt
-            },
-            # Previous conversation history - maintains context
-            *conversation_history,
-            # New question - current query
-            {
-                "role": "user",
-                "content": [{"type": "text", "text":   new_question}]
-            }
-        ],
+        betas=["pdfs-2024-09-25", "prompt-caching-2024-07-31"],  # Include both betas
         stream=True
     )
 
-    # Stream each chunk directly
     for chunk in response:
         if chunk.type == "content_block_delta":
             yield chunk.delta.text
@@ -1585,6 +1538,7 @@ def search_web(query: str, num_results: int = 5) -> dict:
         raise Exception(f"Error decoding JSON from Serper API: {str(e)}")
     
 #########################################################
+
 
 
 
@@ -2071,91 +2025,111 @@ async def streamlit_main():
         st.markdown("""
         👁️ **Welcome to the Visual Document Chat Assistant!**
         - This assistant can understand both text AND visual content (images, diagrams, charts)
-        - Perfect for analyzing documents containing visual information
-        - Limitation: The combined data size of uploaded PDFs should not exceed 31MB
-        
-        ⏳ **Note**: The first response may take a bit longer (10-20 seconds) as the system processes and analyzes your documents. 
-        Subsequent responses will be much faster!
+        - Use case:
+            - Perfect for analyzing documents containing visual information
+        - Limitation: 
+            - The combined uploaded PDFs size should not exceed 31MB. 
+            - Slower than the Document Chat Assistant.
         """)
 
         # Initialize session states
-        if "vdc_messages" not in st.session_state:
-            st.session_state.vdc_messages = []
-        if "vdc_pdf_data_list" not in st.session_state:
-            st.session_state.vdc_pdf_data_list = []
+        if "messages" not in st.session_state:
+            st.session_state.messages = []
+            # Initialize with system message
+            st.session_state.messages.append({
+                "role": "user", 
+                "content": [{"type": "text", "text": """You are a world class RAG assistant. Your task is to answer questions based on the provided documents.
+                - Focus on providing clear and accurate information. If something you are not sure or dont have info, state it.
+                - Asking clarifying questions to give a better answer if needed
+                - Always provide citation for information you use from the provided documents
+                - If the info refers to a different section, state it."""}]
+            })
 
+        if "pdf_data_list" not in st.session_state:
+            st.session_state.pdf_data_list = []
 
         # File uploader with session state
         uploaded_files = st.file_uploader(
             "Upload your PDFs - Should be less than 31MB total", 
             type="pdf", 
-            accept_multiple_files=True, 
-            help="Limit 31MB per file • PDF",
-            key="vdc_pdf_uploader"
+            accept_multiple_files=True
         )
 
         if uploaded_files:
             # Clear existing PDFs if new ones are uploaded
-            st.session_state.vdc_pdf_data_list = []
+            st.session_state.pdf_data_list = []
             
             for uploaded_file in uploaded_files:
-                # Check file size (31MB limit)
                 file_size = len(uploaded_file.read())
-                uploaded_file.seek(0)  # Reset file pointer
+                uploaded_file.seek(0)
                 
                 if file_size > 31 * 1024 * 1024:
-                    st.error(f"File '{uploaded_file.name}' exceeds 31MB limit. This file will be skipped.")
+                    st.error(f"File '{uploaded_file.name}' exceeds 31MB limit.")
                 else:
-                    # Add PDF data to session state list
                     pdf_data = base64.b64encode(uploaded_file.read()).decode("utf-8")
-                    st.session_state.vdc_pdf_data_list.append(pdf_data)
+                    # Add PDF document to messages with cache control
+                    st.session_state.messages.append({
+                        "role": "user",
+                        "content": [{
+                            "type": "document",
+                            "source": {
+                                "type": "base64",
+                                "media_type": "application/pdf",
+                                "data": pdf_data
+                            },
+                            "cache_control": {"type": "ephemeral"}  # Add cache control
+                        }]
+                    })
+            st.success(f"Successfully loaded {len(uploaded_files)} PDF(s)")
+
+        # Display chat messages (excluding system and PDF messages)
+        for message in st.session_state.messages:
+            # Skip initial system-like message, PDFs, and actual system messages
+            if (message["role"] == "user" and 
+                "You are a world class RAG assistant" in str(message["content"]) or  # Skip initial prompt
+                any(content.get("type") == "document" for content in message["content"])):  # Skip PDFs
+                continue
+                
+            with st.chat_message(message["role"]):
+                for content in message["content"]:
+                    if content.get("type") == "text":
+                        st.write(content["text"])
+
+        # Chat input
+        if prompt := st.chat_input("Ask a question about your PDFs"):
+            # Add user message
+            user_message = {
+                "role": "user",
+                "content": [{"type": "text", "text": prompt}]
+            }
+            st.session_state.messages.append(user_message)
             
-            if st.session_state.vdc_pdf_data_list:
-                st.success(f"Successfully loaded {len(st.session_state.vdc_pdf_data_list)} PDF(s)")
+            with st.chat_message("user"):
+                st.write(prompt)
 
-        # Show chat interface if we have PDF data
-        if st.session_state.vdc_pdf_data_list:
-            # Display chat messages
-            for message in st.session_state.vdc_messages:
-                with st.chat_message(message["role"]):
-                    st.write(message["content"])
-
-                            
-
-            # Regular chat  
-            if prompt := st.chat_input("Ask a question about your PDFs"):
-                # Display user message
-                with st.chat_message("user"):
-                    st.write(prompt)
-
-                # Add user message to chat history
-                st.session_state.vdc_messages.append({"role": "user", "content": prompt})
-
-                # Get AI response
-                try:
-                    # Display assistant's streaming response
-                #Spining thinking
-                    with st.spinner("Thinking..."):
-                        with st.chat_message("assistant"):
-                            message_placeholder = st.empty()
-                            full_response = ""
-                            for chunk in analyze_pdf_conversation( st.session_state.vdc_pdf_data_list, st.session_state.vdc_messages, prompt):
-                                full_response += chunk
-                                message_placeholder.markdown(full_response + "▌")
-                            message_placeholder.markdown(full_response)  # Final update without cursor
+            # Get AI response
+            with st.spinner("Thinking..."):
+                with st.chat_message("assistant"):
+                    message_placeholder = st.empty()
+                    full_response = ""
                     
-                    # Add to conversation history after complete
-                    st.session_state.vdc_messages.append({"role": "assistant", "content": full_response})
+                    # Stream response
+                    for chunk in analyze_pdf_conversation(st.session_state.messages):
+                        full_response += chunk
+                        message_placeholder.markdown(full_response + "▌")
+                    message_placeholder.markdown(full_response)
                     
-                except Exception as e:
-                    st.error(f"Error: {e}")
-                    # Add reset button at the bottom of conversation
-            if st.session_state.vdc_messages:  # Only show reset button if there are messages
-                if st.button("Reset Chat"):
-                    st.session_state.vdc_messages = []
-                    st.rerun()
-        else:
-            st.info("Please upload one or more PDF files to start chatting!")
+                    # Add assistant response to messages
+                    st.session_state.messages.append({
+                        "role": "assistant",
+                        "content": [{"type": "text", "text": full_response}]
+                    })
+
+        # Reset chat button
+        if st.button("Reset Chat"):
+            # Keep only system message
+            st.session_state.messages = [st.session_state.messages[0]]
+            st.rerun()
 
     if tool_choice == "Chat Assistant":
         basic_chat()

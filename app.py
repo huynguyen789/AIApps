@@ -352,14 +352,14 @@ async def generate_job_description(job_title, additional_requirements, is_pws):
 async def improve_job_description(original_jd, feedback, job_title, additional_requirements):
     improve_prompt = load_prompt('improve_job_description.txt')
     improve_input = f"""
-Original Job Title: {job_title}
-Additional Requirements: {additional_requirements}
+        Original Job Title: {job_title}
+        Additional Requirements: {additional_requirements}
 
-Original Job Description:
-{original_jd}
+        Original Job Description:
+        {original_jd}
 
-User Feedback:
-{feedback}
+        User Feedback:
+        {feedback}
 """
     async for content in generate_response("gpt4", improve_input, system_prompt=improve_prompt):
         yield content
@@ -1202,14 +1202,13 @@ def analyze_pdf_conversation(pdf_data_list, conversation_history, new_question):
                 "role": "user",
                 "content": pdf_documents
             },
-            # Previous conversation history - maintains context
-            *conversation_history,
-            # New question - current query
-            # System prompt first
-            {
+                        {
                 "role": "user",
                 "content": sys_prompt
             },
+            # Previous conversation history - maintains context
+            *conversation_history,
+            # New question - current query
             {
                 "role": "user",
                 "content": [{"type": "text", "text":   new_question}]
@@ -2085,10 +2084,6 @@ async def streamlit_main():
         if "vdc_pdf_data_list" not in st.session_state:
             st.session_state.vdc_pdf_data_list = []
 
-        # # Add reset button in the sidebar
-        # if st.sidebar.button("Reset Chat"):
-        #     st.session_state.vdc_messages = []
-        #     st.rerun()
 
         # File uploader with session state
         uploaded_files = st.file_uploader(
@@ -2125,7 +2120,9 @@ async def streamlit_main():
                 with st.chat_message(message["role"]):
                     st.write(message["content"])
 
-            # Chat input
+                            
+
+            # Regular chat  
             if prompt := st.chat_input("Ask a question about your PDFs"):
                 # Display user message
                 with st.chat_message("user"):
@@ -2137,17 +2134,15 @@ async def streamlit_main():
                 # Get AI response
                 try:
                     # Display assistant's streaming response
-                    with st.chat_message("assistant"):
-                        message_placeholder = st.empty()
-                        full_response = ""
-                        for chunk in analyze_pdf_conversation(
-                            st.session_state.vdc_pdf_data_list,
-                            st.session_state.vdc_messages[:-1],
-                            prompt
-                        ):
-                            full_response += chunk
-                            message_placeholder.markdown(full_response + "▌")
-                        message_placeholder.markdown(full_response)  # Final update without cursor
+                #Spining thinking
+                    with st.spinner("Thinking..."):
+                        with st.chat_message("assistant"):
+                            message_placeholder = st.empty()
+                            full_response = ""
+                            for chunk in analyze_pdf_conversation( st.session_state.vdc_pdf_data_list, st.session_state.vdc_messages, prompt):
+                                full_response += chunk
+                                message_placeholder.markdown(full_response + "▌")
+                            message_placeholder.markdown(full_response)  # Final update without cursor
                     
                     # Add to conversation history after complete
                     st.session_state.vdc_messages.append({"role": "assistant", "content": full_response})

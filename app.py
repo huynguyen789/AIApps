@@ -366,23 +366,6 @@ User Feedback:
 #########################################################
 
 
-#Writing tools
-async def process_text(user_input, task):
-    prompts = {
-        "grammar": "Correct the grammar in the following text...",
-        "rewrite": "Rewrite the following text professionally...",
-        "summarize": "Summarize the following text concisely...",
-        "explain": "Explain the following text in two parts..."
-    }
-   
-    user_input = f'"{user_input}"'
-    
-    async for content in generate_response("gpt4", user_input, system_prompt=prompts[task]):
-        yield content
-
-    # return processed_content
-#########################################################
-
 
 #BD Response Assistant
 async def get_feedback(document, requirements, user_instructions):
@@ -1228,7 +1211,7 @@ def analyze_pdf_conversation(pdf_data_list, conversation_history, new_question):
 
 
 
-#CHAT APP:
+#CHAT ASSISTANT:
 def get_writing_personas():
     """
     Input: None
@@ -1237,12 +1220,14 @@ def get_writing_personas():
     """
     return {
     "Default Assistant": 
-        """You are a helpful, friendly, and knowledgeable AI assistant. Your approach includes:
-        - Providing clear and accurate information
+        """You are a helpful, friendly, and knowledgeable AI assistant with ability to use tools. Your approach includes:
+        - Providing clear and accurate information. If something you are not sure, state it.
         - Being conversational and engaging
-        - Maintaining a helpful and professional tone
         - Asking clarifying questions to give a better answer if needed
-        Focus on being helpful while maintaining a natural conversation flow.""",
+        
+        Available tools:
+        - Generate diagrams, flowcharts, and mermaid diagrams.
+        """,
                 
     "Professional Writer": 
         """You are a professional writer and editor. Your expertise includes:
@@ -1297,10 +1282,10 @@ def basic_chat():
     # Move model and persona selectors to the top
     col1, col2 = st.columns(2)
     
-    with col1:
+    with col2:
         model_choice = render_model_selector(default_model="gpt4o")
     
-    with col2:
+    with col1:
         # Persona selector
         personas = get_writing_personas()
         selected_persona = st.selectbox(
@@ -1347,29 +1332,6 @@ def basic_chat():
                 )
                 
         # Display chat history with Mermaid support
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            content = message["content"]
-            
-            # Check for Mermaid diagram in the content
-            if "```mermaid" in content:
-                # Split content and render each part appropriately
-                parts = content.split("```")
-                for i, part in enumerate(parts):
-                    if part.startswith("mermaid\n"):
-                        # Render Mermaid diagram
-                        mermaid_code = part.replace("mermaid\n", "").strip()
-                        try:
-                            stmd.st_mermaid(mermaid_code, height=400)
-                        except Exception as e:
-                            st.error(f"Error rendering diagram: {str(e)}")
-                            st.code(mermaid_code, language="mermaid")
-                    elif part.strip():
-                        # Render regular text
-                        st.markdown(part)
-            else:
-                # Regular markdown rendering
-                st.markdown(content)
 
     
     # Display chat history
@@ -1405,34 +1367,6 @@ def basic_chat():
         
         # Add assistant response to history
         st.session_state.messages.append({"role": "assistant", "content": full_response})
-
-def get_current_time():
-    """Get current time in readable format"""
-    current_time = datetime.now()
-    return current_time.strftime("%I:%M %p, %B %d, %Y")
-def generate_mermaid_diagram_sync(description):
-    """
-    Input: Text description of desired diagram
-    Process: Uses Claude to generate Mermaid diagram code synchronously
-    Output: Returns Mermaid diagram code as string
-    """
-    prompt = """
-    You are an expert in creating Mermaid diagrams. Based on the user's description, generate a Mermaid diagram code.
-    Make sure the code is valid and follows Mermaid syntax. Return only the Mermaid code, without any additional text or explanations, tags, or code block markers.
-    If the chart getting weirdly too long, make sure to design it so it fit nicely in user monitor(not super long that they have to scroll too much).
-    Only return the code, no mermaid tag. 
-    """
-    
-    response = client.chat.completions.create(
-        model="gpt-4o",
-        messages=[
-            {"role": "system", "content": prompt},
-            {"role": "user", "content": f"Create a Mermaid diagram for: {description}"}
-        ],
-        temperature=0
-    )
-    
-    return response.choices[0].message.content.strip()
 
 
 def generate_response_sync(model_name: str, prompt: str, conversation_history: list, system_prompt: Optional[str] = None):
@@ -1531,13 +1465,6 @@ def generate_response_sync(model_name: str, prompt: str, conversation_history: l
             elif function_name == "create_mermaid_diagram":
                 description = function_args.get("description", "")
             
-
-                # In messages array
-                messages.append({
-                    "role": "function",
-                    "name": function_name, 
-                    "content": json.dumps({"result": function_response})
-                })
                 # yield "```mermaid\n"
                 diagram_code = generate_mermaid_diagram_sync(description)
                 # yield f"{diagram_code}\n```\n\n"
@@ -1578,6 +1505,75 @@ def generate_response_sync(model_name: str, prompt: str, conversation_history: l
                     yield chunk.choices[0].delta.content
 
 
+#tools:
+def get_current_time():
+    """Get current time in readable format"""
+    current_time = datetime.now()
+    return current_time.strftime("%I:%M %p, %B %d, %Y")
+def generate_mermaid_diagram_sync(description):
+    """
+    Input: Text description of desired diagram
+    Process: Uses Claude to generate Mermaid diagram code synchronously
+    Output: Returns Mermaid diagram code as string
+    """
+    prompt = """
+    You are an expert in creating Mermaid diagrams. Based on the user's description, generate a Mermaid diagram code.
+    Make sure the code is valid and follows Mermaid syntax. Return only the Mermaid code, without any additional text or explanations, tags, or code block markers.
+    If the chart getting weirdly too long, make sure to design it so it fit nicely in user monitor(not super long that they have to scroll too much).
+    Only return the code, no mermaid tag. 
+    """
+    
+    response = client.chat.completions.create(
+        model="gpt-4o",
+        messages=[
+            {"role": "system", "content": prompt},
+            {"role": "user", "content": f"Create a Mermaid diagram for: {description}"}
+        ],
+        temperature=0
+    )
+    
+    return response.choices[0].message.content.strip()
+
+def search_web(query: str, num_results: int = 5) -> dict:
+    """
+    Perform a web search using Serper API
+    
+    Args:
+        query (str): The search query
+        num_results (int): Number of results to return (default: 5)
+        
+    Returns:
+        dict: Search results containing organic results and other data
+    """
+    url = "https://google.serper.dev/search"
+    payload = json.dumps({"q": query})
+    headers = {
+        'X-API-KEY': st.secrets["SERPER_API_KEY"],
+        'Content-Type': 'application/json'
+    }
+    
+    try:
+        response = requests.post(url, headers=headers, data=payload)
+        response.raise_for_status()
+        search_results = response.json()
+        
+        # Limit the number of organic results
+        if 'organic' in search_results:
+            search_results['organic'] = search_results['organic'][:num_results]
+            
+        return search_results
+    except requests.exceptions.RequestException as e:
+        error_message = f"Error calling Serper API: {str(e)}"
+        if hasattr(e, 'response') and e.response is not None:
+            error_message += f"\nResponse content: {e.response.text}"
+        raise Exception(error_message)
+    except json.JSONDecodeError as e:
+        raise Exception(f"Error decoding JSON from Serper API: {str(e)}")
+    
+#########################################################
+
+
+
 
 
 
@@ -1606,7 +1602,7 @@ async def streamlit_main():
         "Document Chat Assistant",
         "Visual Document Chat Assistant",
         "Search Assistant",
-        "Writing Assistant",
+        #"Writing Assistant",
         #"Diagram Creation Assistant",
         "Prompt Engineering Assistant"
     ])
@@ -1714,54 +1710,6 @@ async def streamlit_main():
                 st.warning("Please generate a job description first.")
             else:
                 st.warning("Please provide feedback to improve the job description.")
-   
-    elif tool_choice == "Writing Assistant":
-        st.header("Writing Assistant ✍️")
-        st.write("Welcome to the Writing Assistant! Here you can improve your writing with AI-powered tools. Choose from the following options:")
-        st.write("1. Professional Rewrite: Enhance the professionalism of your text.")
-        st.write("2. Correct Grammar: Fix grammatical errors in your text.")
-        st.write("3. Summarize: Get a concise summary of your text.")
-        st.write("4. Explain: Simplify and explain your text.")
-
-        if 'user_input' not in st.session_state:
-            st.session_state.user_input = ""
-        if 'task' not in st.session_state:
-            st.session_state.task = "Professional Rewrite"
-        if 'processed_text' not in st.session_state:
-            st.session_state.processed_text = ""
-
-        # File upload option for user input
-        input_file = st.file_uploader("Upload your text (Word or Text file)", type=['docx', 'txt'])
-        if input_file:
-            st.session_state.user_input = read_file(input_file)
-        
-        user_input = st.text_area("Or enter your text here:", 
-                                  value=st.session_state.user_input,
-                                  height=200, 
-                                  key="user_input")
-        
-        task = st.selectbox("Choose a task:", ["Professional Rewrite", "Correct Grammar", "Summarize", "Explain"], key="task")
-        
-        if st.button("Process Text"):
-            if user_input:
-                task_map = {
-                    "Correct Grammar": "grammar",
-                    "Professional Rewrite": "rewrite",
-                    "Summarize": "summarize",
-                    "Explain": "explain"
-                }
-        
-                with st.spinner(f"Processing text ({task.lower()})..."):
-                    processed_text_placeholder = st.empty()
-                    full_content = ""
-                    async for content in process_text(user_input, task_map[task]):
-                        full_content += content
-                        processed_text_placeholder.markdown(full_content)
-                    st.session_state.processed_text = full_content
-
-        # if st.session_state.processed_text:
-            # st.markdown(f"### {task} Result:")
-            # st.write(st.session_state.processed_text)
 
     elif tool_choice == "BD Response Assistant":
         st.header("BD Response Assistant 📄")

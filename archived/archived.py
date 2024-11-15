@@ -68,7 +68,27 @@ def generate_mermaid_chart(mermaid_code, format='png'):
     else:
         return None    
 #########################################################
+  
+
+#Writing tools
+async def process_text(user_input, task):
+    prompts = {
+        "grammar": "Correct the grammar in the following text...",
+        "rewrite": "Rewrite the following text professionally...",
+        "summarize": "Summarize the following text concisely...",
+        "explain": "Explain the following text in two parts..."
+    }
+   
+    user_input = f'"{user_input}"'
     
+    async for content in generate_response("gpt4", user_input, system_prompt=prompts[task]):
+        yield content
+
+    # return processed_content
+#########################################################
+
+
+  
 
 elif tool_choice == "Diagram Creation Assistant":
     st.header("Diagram Creation Assistant 🎨")
@@ -128,3 +148,52 @@ elif tool_choice == "Diagram Creation Assistant":
         st.session_state.diagram_description = ""
         st.session_state.mermaid_code = ""
         st.rerun()
+
+   
+    elif tool_choice == "Writing Assistant":
+        st.header("Writing Assistant ✍️")
+        st.write("Welcome to the Writing Assistant! Here you can improve your writing with AI-powered tools. Choose from the following options:")
+        st.write("1. Professional Rewrite: Enhance the professionalism of your text.")
+        st.write("2. Correct Grammar: Fix grammatical errors in your text.")
+        st.write("3. Summarize: Get a concise summary of your text.")
+        st.write("4. Explain: Simplify and explain your text.")
+
+        if 'user_input' not in st.session_state:
+            st.session_state.user_input = ""
+        if 'task' not in st.session_state:
+            st.session_state.task = "Professional Rewrite"
+        if 'processed_text' not in st.session_state:
+            st.session_state.processed_text = ""
+
+        # File upload option for user input
+        input_file = st.file_uploader("Upload your text (Word or Text file)", type=['docx', 'txt'])
+        if input_file:
+            st.session_state.user_input = read_file(input_file)
+        
+        user_input = st.text_area("Or enter your text here:", 
+                                  value=st.session_state.user_input,
+                                  height=200, 
+                                  key="user_input")
+        
+        task = st.selectbox("Choose a task:", ["Professional Rewrite", "Correct Grammar", "Summarize", "Explain"], key="task")
+        
+        if st.button("Process Text"):
+            if user_input:
+                task_map = {
+                    "Correct Grammar": "grammar",
+                    "Professional Rewrite": "rewrite",
+                    "Summarize": "summarize",
+                    "Explain": "explain"
+                }
+        
+                with st.spinner(f"Processing text ({task.lower()})..."):
+                    processed_text_placeholder = st.empty()
+                    full_content = ""
+                    async for content in process_text(user_input, task_map[task]):
+                        full_content += content
+                        processed_text_placeholder.markdown(full_content)
+                    st.session_state.processed_text = full_content
+
+        # if st.session_state.processed_text:
+            # st.markdown(f"### {task} Result:")
+            # st.write(st.session_state.processed_text)

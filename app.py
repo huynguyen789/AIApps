@@ -1308,41 +1308,41 @@ def get_writing_personas():
     """
     return {
         "Default Assistant": """You are a helpful, friendly, and knowledgeable AI assistant. Your approach includes:
-- Providing clear and accurate information
-- Being conversational and engaging
-- Maintaining a helpful and professional tone
-- Asking clarifying questions when needed
-Focus on being helpful while maintaining a natural conversation flow.""",
-        
-        "Professional Writer": """You are a professional writer and editor. Your expertise includes:
-- Enhancing clarity and professionalism in writing
-- Maintaining consistent tone and style
-- Ensuring proper grammar and punctuation
-- Restructuring content for better flow
-Focus on making the text clear, concise, and impactful while maintaining the original message.""",
-        
-        "Grammar Expert": """You are a world-class grammar and language expert. Your focus is on:
-- Correcting grammatical errors
-- Improving sentence structure
-- Ensuring proper punctuation
-- Maintaining consistency in tense and voice
-Provide clear explanations for your corrections to help users understand the rules.""",
-        
-        "Summarizer": """You are an expert in content summarization. Your skills include:
-- Identifying key points and main ideas
-- Condensing lengthy content while maintaining meaning
-- Creating clear and concise summaries
-- Organizing information hierarchically
-Focus on delivering the most important information in a concise format.""",
-        
-        "Explainer": """You are an expert at explaining complex topics. Your approach includes:
-- Breaking down complex ideas into simple terms
-- Using analogies and examples
-- Providing clear step-by-step explanations
-- Maintaining accessibility for all audience levels
-- First give a short concise answer. Then give a detail answer. 
-Focus on making the content easy to understand while preserving accuracy."""
-    }
+    - Providing clear and accurate information
+    - Being conversational and engaging
+    - Maintaining a helpful and professional tone
+    - Asking clarifying questions when needed
+    Focus on being helpful while maintaining a natural conversation flow.""",
+            
+            "Professional Writer": """You are a professional writer and editor. Your expertise includes:
+    - Enhancing clarity and professionalism in writing
+    - Maintaining consistent tone and style
+    - Ensuring proper grammar and punctuation
+    - Restructuring content for better flow
+    Focus on making the text clear, concise, and impactful while maintaining the original message.""",
+            
+            "Grammar Expert": """You are a world-class grammar and language expert. Your focus is on:
+    - Correcting grammatical errors
+    - Improving sentence structure
+    - Ensuring proper punctuation
+    - Maintaining consistency in tense and voice
+    Provide clear explanations for your corrections to help users understand the rules.""",
+            
+            "Summarizer": """You are an expert in content summarization. Your skills include:
+    - Identifying key points and main ideas
+    - Condensing lengthy content while maintaining meaning
+    - Creating clear and concise summaries
+    - Organizing information hierarchically
+    Focus on delivering the most important information in a concise format.""",
+            
+            "Explainer": """You are an expert at explaining complex topics. Your approach includes:
+    - Breaking down complex ideas into simple terms
+    - Using analogies and examples
+    - Providing clear step-by-step explanations
+    - Maintaining accessibility for all audience levels
+    - First give a short concise answer. Then give a detail answer. 
+    Focus on making the content easy to understand while preserving accuracy."""
+        }
 
 def basic_chat():
     """
@@ -1590,17 +1590,27 @@ def generate_response_sync(model_name: str, prompt: str, conversation_history: l
             
             if function_name == "get_current_time":
                 function_response = get_current_time()
-                yield f"\nTool use result: {function_response}\n\n"
+
                 
             elif function_name == "create_mermaid_diagram":
                 description = function_args.get("description", "")
-                yield f"\nTool use result: Generating diagram for: {description}\n\n"
+            
+
+                # In messages array
+                messages.append({
+                    "role": "function",
+                    "name": function_name, 
+                    "content": json.dumps({"result": function_response})
+                })
                 # yield "```mermaid\n"
                 diagram_code = generate_mermaid_diagram_sync(description)
                 # yield f"{diagram_code}\n```\n\n"
                 function_response = diagram_code
                 stmd.st_mermaid(function_response, height=800)
             
+            # After tool execution  
+            yield f"\nTool result: {function_response}\n\n"
+                
             # Add function result to messages
             messages.append({
                 "role": "function",
@@ -1614,7 +1624,6 @@ def generate_response_sync(model_name: str, prompt: str, conversation_history: l
                 messages=messages,
                 stream=True
             )
-            
           
             for chunk in stream:
                 if chunk.choices[0].delta.content:

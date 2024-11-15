@@ -1181,6 +1181,16 @@ def analyze_pdf_conversation(pdf_data_list, conversation_history, new_question):
         for pdf_data in pdf_data_list
     ]
     
+    #System prompt:
+    sys_prompt = """<instruction> You are a a world class RAG assistant. Your task is to answer questions based on the provided documents.
+    
+    - Focus on providing clear and accurate information. If something you are not sure or dont have info, state it.
+    - Asking clarifying questions to give a better answer if needed
+    - Always provide citation for information you use from the provided documents
+    - If the info refers to a different section, state it.
+    </instruction>
+    """
+    
     # Stream response from Claude
     response = client.beta.messages.create(
         model="claude-3-5-sonnet-20241022",
@@ -1195,9 +1205,14 @@ def analyze_pdf_conversation(pdf_data_list, conversation_history, new_question):
             # Previous conversation history - maintains context
             *conversation_history,
             # New question - current query
+            # System prompt first
             {
                 "role": "user",
-                "content": [{"type": "text", "text": new_question}]
+                "content": sys_prompt
+            },
+            {
+                "role": "user",
+                "content": [{"type": "text", "text":   new_question}]
             }
         ],
         stream=True

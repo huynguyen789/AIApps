@@ -1292,7 +1292,18 @@ def basic_chat():
         st.session_state.messages = []
     if 'selected_persona' not in st.session_state:
         st.session_state.selected_persona = "Default Assistant"
+    st.session_state.messages = [{
+            "role": "assistant",
+            "content": f"""👋 Hi! I'm your AI assistant. Here's what I can help you with:
+\n• Search the web for real-time information about any topic
+\n• Create visual diagrams and flowcharts.
+\n• Answer questions and engage in natural conversation
 
+Just ask me anything! I'll use the best tools available to help you."""
+                    }]
+    
+
+    
     # Move model and persona selectors to the top
     col1, col2 = st.columns(2)
     
@@ -1506,9 +1517,12 @@ def generate_response_sync(model_name: str, prompt: str, conversation_history: l
                 query = function_args.get("query", "")
                 search_results = search_web(query)
                 function_response = json.dumps(search_results, indent=2)
-            
-            # After tool execution  
-            yield f"\nTool result: {function_response}\n\n"
+                # Create an expander for search results
+                with st.expander("🔍 View Search Results"):
+                    st.code(function_response, language="json")
+                yield "\nWeb search completed. Results available in dropdown above.\n\n"
+            else:
+                yield f"\nTool result: {function_response}\n\n"
                 
             # Add function result to messages
             messages.append({

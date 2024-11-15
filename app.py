@@ -1295,11 +1295,13 @@ def basic_chat():
     st.session_state.messages = [{
             "role": "assistant",
             "content": f"""👋 Hi! I'm your AI assistant. Here's what I can help you with:
-\n• Search the web for real-time information about any topic
-\n• Create visual diagrams and flowcharts.
-\n• Answer questions and engage in natural conversation
+\n• Answer questions, brainstorms, summarize, explain, etc.
+\n• Search the web for real-time information about any topic. (Only gpt4o)
+\n• Create visual diagrams and flowcharts. (Only gpt4o)
 
-Just ask me anything! I'll use the best tools available to help you."""
+Just ask me anything! I'll use the best tools available to help you.
+
+"""
                     }]
     
 
@@ -1405,7 +1407,7 @@ def generate_response_sync(model_name: str, prompt: str, conversation_history: l
     # Prepare messages
     messages = []
     if system_prompt:
-        messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": system_prompt})
     messages.extend(conversation_history)
     messages.append({"role": "user", "content": prompt})
     
@@ -1430,7 +1432,9 @@ def generate_response_sync(model_name: str, prompt: str, conversation_history: l
             stream=True
         )
         for chunk in response:
-            if chunk.delta.text:
+            if hasattr(chunk, 'text') and chunk.text:  # For non-delta chunks
+                yield chunk.text
+            elif hasattr(chunk, 'delta') and hasattr(chunk.delta, 'text') and chunk.delta.text:  # For delta chunks
                 yield chunk.delta.text
                 
     elif model_name == 'gpt4' or "gpt4o":  # GPT-4

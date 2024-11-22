@@ -1299,7 +1299,7 @@ Just ask me anything! I'll use the best tools available to help you."""
         }]
     
     # Model and persona selection
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns([2, 2, 1])
     with col2:
         model_choice = render_model_selector(default_model="gpt4o")
     
@@ -1311,6 +1311,14 @@ Just ask me anything! I'll use the best tools available to help you."""
             index=0,
             help="Choose how you want the AI to behave"
         )
+    
+    # Add reset button in the third column
+    with col3:
+        if st.button("Reset Chat"):
+            # Keep only the first message (instruction)
+            initial_message = st.session_state.messages[0]
+            st.session_state.messages = [initial_message]
+            st.rerun()
     
     # Display chat history
     for message in st.session_state.messages:
@@ -1440,7 +1448,8 @@ def generate_response_sync(model_name: str, messages: list):
             tool_choice="auto",
             stream=False
         )
-
+        
+     
         # Handle tool calls
         if response.choices[0].message.tool_calls:
             tool_call = response.choices[0].message.tool_calls[0]
@@ -1452,6 +1461,7 @@ def generate_response_sync(model_name: str, messages: list):
             # Execute tool and get result
             if function_name == "get_current_time":
                 function_response = get_current_time()
+                yield f"\n"
             elif function_name == "create_mermaid_diagram":
                 description = function_args.get("description", "")
                 diagram_code = generate_mermaid_diagram_sync(description)

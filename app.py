@@ -1626,11 +1626,6 @@ def search_web(query: str, num_results: int = 10) -> dict:
 
 
 
-
-
-
-
-
 #MAIN APP
 async def streamlit_main():
     # Disable OpenAI request logging
@@ -2204,5 +2199,7 @@ async def streamlit_main():
 
     if tool_choice == "Chat Assistant":
         basic_chat()
+
+
 if __name__ == "__main__":
     asyncio.run(streamlit_main())

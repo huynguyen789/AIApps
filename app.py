@@ -1281,39 +1281,29 @@ def get_writing_personas():
 def basic_chat():
     """
     Input: None
-    Process: Creates chat interface with model and persona selection at the top
+    Process: Creates chat interface with model and persona selection
     Output: Displays chat interface and handles message streaming
-    Logic: Uses session state for history, applies selected persona
     """
     st.header("AI Chat Assistant 💬")
     
-    # Initialize session states
+    # Initialize messages if not exists
     if 'messages' not in st.session_state:
-        st.session_state.messages = []
-    if 'selected_persona' not in st.session_state:
-        st.session_state.selected_persona = "Default Assistant"
-    st.session_state.messages = [{
+        st.session_state.messages = [{
             "role": "assistant",
             "content": f"""👋 Hi! I'm your AI assistant. Here's what I can help you with:
 \n• Answer questions, brainstorms, summarize, explain, etc.
 \n• Search the web for real-time information about any topic. (Only gpt4o)
 \n• Create visual diagrams and flowcharts. (Only gpt4o)
 
-Just ask me anything! I'll use the best tools available to help you.
-
-"""
-                    }]
+Just ask me anything! I'll use the best tools available to help you."""
+        }]
     
-
-    
-    # Move model and persona selectors to the top
+    # Model and persona selection
     col1, col2 = st.columns(2)
-    
     with col2:
         model_choice = render_model_selector(default_model="gpt4o")
     
     with col1:
-        # Persona selector
         personas = get_writing_personas()
         selected_persona = st.selectbox(
             "Select Assistant Persona:",
@@ -1321,45 +1311,6 @@ Just ask me anything! I'll use the best tools available to help you.
             index=0,
             help="Choose how you want the AI to behave"
         )
-        
-        # Update persona if changed
-        if selected_persona != st.session_state.selected_persona:
-            if st.session_state.messages:  # Only show warning if there are messages
-                if st.checkbox("Keep chat history when changing persona?", value=False):
-                    st.session_state.selected_persona = selected_persona
-                else:
-                    st.session_state.messages = []
-                    st.session_state.selected_persona = selected_persona
-                    st.rerun()
-            else:
-                st.session_state.selected_persona = selected_persona
-    
-    # # Display current persona as a small badge
-    # st.caption(f"🎭 {st.session_state.selected_persona}")
-    
-    # Move chat controls to sidebar
-    with st.sidebar:
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("Clear Chat"):
-                st.session_state.messages = []
-                st.rerun()
-        
-        with col2:
-            if st.session_state.messages:
-                export_data = "\n\n".join([
-                    f"{msg['role'].title()}: {msg['content']}"
-                    for msg in st.session_state.messages
-                ])
-                st.download_button(
-                    "Export Chat",
-                    export_data,
-                    file_name=f"chat_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
-                    mime="text/plain"
-                )
-                
-        # Display chat history with Mermaid support
-
     
     # Display chat history
     for message in st.session_state.messages:
@@ -1368,26 +1319,27 @@ Just ask me anything! I'll use the best tools available to help you.
     
     # Chat input
     if prompt := st.chat_input("What's on your mind?"):
-        # Add user message
+        # Add user message to history
         st.session_state.messages.append({"role": "user", "content": prompt})
         with st.chat_message("user"):
             st.markdown(prompt)
         
-        # Get system prompt for current persona
-        system_prompt = personas[st.session_state.selected_persona]
+        # Get system prompt based on persona
+        system_prompt = personas[selected_persona]
+        
+        # For Claude, add system prompt as user message
+        if model_choice == "claude":
+            messages = [{"role": "user", "content": system_prompt}] + st.session_state.messages
+        else:
+            messages = [{"role": "system", "content": system_prompt}] + st.session_state.messages
         
         # Display assistant response
         with st.chat_message("assistant"):
             message_placeholder = st.empty()
             full_response = ""
             
-            # Generate response with full conversation history
-            for chunk in generate_response_sync(
-                model_choice,
-                prompt,
-                conversation_history=st.session_state.messages[:-1],  # Exclude current prompt
-                system_prompt=system_prompt
-            ):
+            # Generate response using full message history
+            for chunk in generate_response_sync(model_choice, messages):
                 full_response += chunk
                 message_placeholder.markdown(full_response + "▌")
             message_placeholder.markdown(full_response)
@@ -1395,49 +1347,43 @@ Just ask me anything! I'll use the best tools available to help you.
         # Add assistant response to history
         st.session_state.messages.append({"role": "assistant", "content": full_response})
 
-
-def generate_response_sync(model_name: str, prompt: str, conversation_history: list, system_prompt: Optional[str] = None):
+def generate_response_sync(model_name: str, messages: list):
     """
-    Input: model_name, prompt, conversation_history, optional system_prompt
+    Input: model_name, messages (includes system prompt and conversation history)
     Process: Generates streaming response with function calling support
     Output: Yields response chunks and function call results
     """
     client = get_model(model_name)
     
-    # Prepare messages
-    messages = []
-    if system_prompt:
-        messages.append({"role": "user", "content": system_prompt})
-    messages.extend(conversation_history)
-    messages.append({"role": "user", "content": prompt})
-    
-    if model_name.startswith('gemini'):  # Gemini models
-        formatted_history = "\n".join([
+    if model_name.startswith('gemini'):
+        # Format messages for Gemini's API
+        formatted_messages = "\n".join([
             f"{'Assistant' if msg['role'] == 'assistant' else 'User'}: {msg['content']}"
-            for msg in conversation_history
+            for msg in messages if msg['role'] != 'system'
         ])
-        full_prompt = f"{system_prompt}\n\nConversation History:\n{formatted_history}\n\nUser: {prompt}"
+        system_content = next((msg['content'] for msg in messages if msg['role'] == 'system'), "")
+        full_prompt = f"{system_content}\n\n{formatted_messages}"
         
         response = client.generate_content(full_prompt, stream=True)
         for chunk in response:
             if chunk.text:
                 yield chunk.text
                 
-    elif model_name == 'claude':  # Claude
+    elif model_name == 'claude':
         response = client.messages.create(
             model="claude-3-5-sonnet-20241022",
             max_tokens=4096,
             temperature=0,
-            messages=messages,
+            messages=messages,  # Claude handles user messages for system prompts
             stream=True
         )
         for chunk in response:
-            if hasattr(chunk, 'text') and chunk.text:  # For non-delta chunks
+            if hasattr(chunk, 'text') and chunk.text:
                 yield chunk.text
-            elif hasattr(chunk, 'delta') and hasattr(chunk.delta, 'text') and chunk.delta.text:  # For delta chunks
+            elif hasattr(chunk, 'delta') and hasattr(chunk.delta, 'text') and chunk.delta.text:
                 yield chunk.delta.text
                 
-    elif model_name == 'gpt4' or "gpt4o":  # GPT-4
+    elif model_name in ['gpt4', 'gpt4o']:
         tools = [
             {
                 "type": "function",
@@ -1495,28 +1441,22 @@ def generate_response_sync(model_name: str, prompt: str, conversation_history: l
             stream=False
         )
 
-        #Tool use response
+        # Handle tool calls
         if response.choices[0].message.tool_calls:
             tool_call = response.choices[0].message.tool_calls[0]
             function_name = tool_call.function.name
             function_args = json.loads(tool_call.function.arguments)
             
-            # Display tool usage messages first
             yield f"\nUsing tool: {function_name}\n"
             
+            # Execute tool and get result
             if function_name == "get_current_time":
                 function_response = get_current_time()
-
-                
             elif function_name == "create_mermaid_diagram":
                 description = function_args.get("description", "")
-            
-                # yield "```mermaid\n"
                 diagram_code = generate_mermaid_diagram_sync(description)
-                # yield f"{diagram_code}\n```\n\n"
                 function_response = diagram_code
                 stmd.st_mermaid(function_response, height=800)
-            
             elif function_name == "search_web":
                 query = function_args.get("query", "")
                 search_results = search_web(query)
@@ -1528,26 +1468,25 @@ def generate_response_sync(model_name: str, prompt: str, conversation_history: l
             else:
                 yield f"\nTool result: {function_response}\n\n"
                 
-            # Add function result to messages
+            # Add tool result to messages
             messages.append({
                 "role": "function",
                 "name": function_name,
                 "content": function_response
             })
             
-            # Get final response
-            stream = client.chat.completions.create(
+            # Get final response with tool result
+            final_response = client.chat.completions.create(
                 model="gpt-4o",
                 messages=messages,
                 stream=True
             )
-          
-            for chunk in stream:
+            
+            for chunk in final_response:
                 if chunk.choices[0].delta.content:
                     yield chunk.choices[0].delta.content
-       
-        #Regular response
         else:
+            # Regular streaming response
             stream = client.chat.completions.create(
                 model="gpt-4o",
                 messages=messages,

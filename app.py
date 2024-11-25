@@ -1335,11 +1335,8 @@ Just ask me anything! I'll use the best tools available to help you."""
         # Get system prompt based on persona
         system_prompt = personas[selected_persona]
         
-        # For Claude, add system prompt as user message
-        if model_choice == "claude":
-            messages = [{"role": "user", "content": system_prompt}] + st.session_state.messages
-        else:
-            messages = [{"role": "system", "content": system_prompt}] + st.session_state.messages
+     
+        messages = [{"role": "user", "content": system_prompt}] + st.session_state.messages
         
         # Display assistant response
         with st.chat_message("assistant"):
@@ -1392,7 +1389,6 @@ def generate_response_sync(model_name: str, messages: list):
                 yield chunk.delta.text
                 
     elif model_name in ['gpt4', 'gpt4o']:
-        # Regular GPT-4 models support all features
         tools = [
             {
                 "type": "function",
@@ -1410,7 +1406,7 @@ def generate_response_sync(model_name: str, messages: list):
                 "type": "function",
                 "function": {
                     "name": "create_mermaid_diagram",
-                    "description": "Generate a Mermaid diagram from a text description",
+                    "description": "Generate a Mermaid diagram from a text description. Use this when user asks for diagrams, flowcharts, or visual representations.",
                     "parameters": {
                         "type": "object",
                         "properties": {
@@ -1427,7 +1423,7 @@ def generate_response_sync(model_name: str, messages: list):
                 "type": "function",
                 "function": {
                     "name": "search_web",
-                    "description": "Search the web for current information",
+                    "description": "Search the web for current information on any topic",
                     "parameters": {
                         "type": "object",
                         "properties": {
@@ -1442,23 +1438,71 @@ def generate_response_sync(model_name: str, messages: list):
             }
         ]
 
-        model_mapping = {
-            'gpt4': 'gpt-4',
-            'gpt4o': 'gpt-4o'
-        }
-        
-        model_id = model_mapping[model_name]
         response = client.chat.completions.create(
-            model=model_id,
+            model="gpt-4o",
             messages=messages,
             tools=tools,
             tool_choice="auto",
-            stream=True
+            stream=False
         )
         
-        for chunk in response:
-            if chunk.choices[0].delta.content:
-                yield chunk.choices[0].delta.content
+     
+        # Handle tool calls
+        if response.choices[0].message.tool_calls:
+            tool_call = response.choices[0].message.tool_calls[0]
+            function_name = tool_call.function.name
+            function_args = json.loads(tool_call.function.arguments)
+            
+            yield f"\nUsing tool: {function_name}\n"
+            
+            # Execute tool and get result
+            if function_name == "get_current_time":
+                function_response = get_current_time()
+                yield f"\n"
+            elif function_name == "create_mermaid_diagram":
+                description = function_args.get("description", "")
+                diagram_code = generate_mermaid_diagram_sync(description)
+                function_response = diagram_code
+                stmd.st_mermaid(function_response, height=800)
+            elif function_name == "search_web":
+                query = function_args.get("query", "")
+                search_results = search_web(query)
+                function_response = json.dumps(search_results, indent=2)
+                # Create an expander for search results
+                with st.expander("🔍 View Search Results"):
+                    st.code(function_response, language="json")
+                yield "\nWeb search completed. Results available in dropdown above.\n\n"
+            else:
+                yield f"\nTool result: {function_response}\n\n"
+                
+            # Add tool result to messages
+            messages.append({
+                "role": "function",
+                "name": function_name,
+                "content": function_response
+            })
+            
+            # Get final response with tool result
+            final_response = client.chat.completions.create(
+                model="gpt-4o",
+                messages=messages,
+                stream=True
+            )
+            
+            for chunk in final_response:
+                if chunk.choices[0].delta.content:
+                    yield chunk.choices[0].delta.content
+        else:
+            # Regular streaming response
+            stream = client.chat.completions.create(
+                model="gpt-4o",
+                messages=messages,
+                stream=True
+            )
+            
+            for chunk in stream:
+                if chunk.choices[0].delta.content:
+                    yield chunk.choices[0].delta.content
 
     elif model_name in ['o1-preview', 'o1-mini']:
         # Special handling for o1 models - strip system messages and tools

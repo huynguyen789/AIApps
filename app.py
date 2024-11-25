@@ -1435,8 +1435,36 @@ def generate_response_sync(model_name: str, messages: list):
                         "required": ["query"]
                     }
                 }
+            },
+            {
+            "type": "function",
+            "function": {
+                "name": "generate_image",
+                "description": "Generate an image using DALL-E 3 based on a text description",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "prompt": {
+                            "type": "string",
+                            "description": "Text description of the image to generate"
+                        },
+                        "size": {
+                            "type": "string",
+                            "enum": ["1024x1024", "1024x1792", "1792x1024"],
+                            "description": "Size of the generated image"
+                        },
+                        "quality": {
+                            "type": "string",
+                            "enum": ["standard", "hd"],
+                            "description": "Quality of the generated image"
+                        }
+                    },
+                    "required": ["prompt"]
+                }
             }
+        }
         ]
+        
 
         response = client.chat.completions.create(
             model="gpt-4o",
@@ -1456,7 +1484,18 @@ def generate_response_sync(model_name: str, messages: list):
             yield f"\nUsing tool: {function_name}\n"
             
             # Execute tool and get result
-            if function_name == "get_current_time":
+            if function_name == "generate_image":
+                yield f"\nNote:\n The image will be deleted in the next message. Please save it before."
+        
+                with st.spinner('Generating image, please wait...'):
+                    function_response = generate_image(
+                        prompt=function_args.get("prompt"),
+                        size=function_args.get("size", "1024x1024"),
+                        quality=function_args.get("quality", "standard")
+                    )
+                
+                
+            elif function_name == "get_current_time":
                 function_response = get_current_time()
                 yield f"\n"
             elif function_name == "create_mermaid_diagram":
@@ -1489,6 +1528,7 @@ def generate_response_sync(model_name: str, messages: list):
                 stream=True
             )
             
+            yield f"\n"
             for chunk in final_response:
                 if chunk.choices[0].delta.content:
                     yield chunk.choices[0].delta.content
@@ -1587,7 +1627,30 @@ def search_web(query: str, num_results: int = 10) -> dict:
         raise Exception(error_message)
     except json.JSONDecodeError as e:
         raise Exception(f"Error decoding JSON from Serper API: {str(e)}")
-    
+
+# Add image generation function
+def generate_image(prompt: str, size: str = "1024x1024", quality: str = "standard") -> str:
+        """
+        Input: Text prompt describing desired image
+        Process: Calls DALL-E 3 API to generate image
+        Output: URL of generated image
+        """
+        try:
+            response = client.images.generate(
+                model="dall-e-3",
+                prompt=prompt,
+                size=size,
+                quality=quality,
+                n=1,
+            )
+            image_url = response.data[0].url
+            
+            # Display image in Streamlit
+            st.image(image_url, caption=f"Generated image for: {prompt}")
+            
+            return f"I've generated an image based on your prompt. You can see it above.\nRevised prompt: {response.data[0].revised_prompt}"
+        except Exception as e:
+            return f"Error generating image: {str(e)}"
 #########################################################
 
 

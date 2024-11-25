@@ -127,10 +127,10 @@ def get_model(model_name: str):
         return genai.GenerativeModel('gemini-1.5-pro-002')
     elif model_name == "claude":
         return Anthropic(api_key=st.secrets["ANTHROPIC_API_KEY"])
-    elif model_name == "gpt4" or "gpt4o":
+    elif model_name in ["gpt4", "gpt4o", "o1-preview", "o1-mini"]:
         return OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
     else:
-        available_models = "gemini-flash, gemini-pro, claude, gpt4"
+        available_models = "gemini-flash, gemini-pro, claude, gpt4, o1-preview, o1-mini"
         raise ValueError(f"Unsupported model: {model_name}. Available models: {available_models}")
 
 
@@ -142,7 +142,7 @@ def render_model_selector(default_model="gemini-flash"):
     Output: Selected model name
     Logic: Uses index of default model in available models list
     """
-    available_models = ["gemini-flash", "gemini-pro", "claude", "gpt4o"]
+    available_models = ["gemini-flash", "gemini-pro", "claude", "gpt4o", "o1-preview", "o1-mini"]
     try:
         default_index = available_models.index(default_model)
     except ValueError:
@@ -1392,6 +1392,7 @@ def generate_response_sync(model_name: str, messages: list):
                 yield chunk.delta.text
                 
     elif model_name in ['gpt4', 'gpt4o']:
+        # Regular GPT-4 models support all features
         tools = [
             {
                 "type": "function",
@@ -1409,7 +1410,7 @@ def generate_response_sync(model_name: str, messages: list):
                 "type": "function",
                 "function": {
                     "name": "create_mermaid_diagram",
-                    "description": "Generate a Mermaid diagram from a text description. Use this when user asks for diagrams, flowcharts, or visual representations.",
+                    "description": "Generate a Mermaid diagram from a text description",
                     "parameters": {
                         "type": "object",
                         "properties": {
@@ -1426,7 +1427,7 @@ def generate_response_sync(model_name: str, messages: list):
                 "type": "function",
                 "function": {
                     "name": "search_web",
-                    "description": "Search the web for current information on any topic",
+                    "description": "Search the web for current information",
                     "parameters": {
                         "type": "object",
                         "properties": {
@@ -1441,71 +1442,44 @@ def generate_response_sync(model_name: str, messages: list):
             }
         ]
 
+        model_mapping = {
+            'gpt4': 'gpt-4',
+            'gpt4o': 'gpt-4o'
+        }
+        
+        model_id = model_mapping[model_name]
         response = client.chat.completions.create(
-            model="gpt-4o",
+            model=model_id,
             messages=messages,
             tools=tools,
             tool_choice="auto",
-            stream=False
+            stream=True
         )
         
-     
-        # Handle tool calls
-        if response.choices[0].message.tool_calls:
-            tool_call = response.choices[0].message.tool_calls[0]
-            function_name = tool_call.function.name
-            function_args = json.loads(tool_call.function.arguments)
+        for chunk in response:
+            if chunk.choices[0].delta.content:
+                yield chunk.choices[0].delta.content
+
+    elif model_name in ['o1-preview', 'o1-mini']:
+        # Special handling for o1 models - strip system messages and tools
+        user_messages = [
+            msg for msg in messages 
+            if msg['role'] != 'system'
+        ]
+        
+        # If empty after filtering, add a default user message
+        if not user_messages:
+            user_messages = [{"role": "user", "content": "Hello"}]
             
-            yield f"\nUsing tool: {function_name}\n"
-            
-            # Execute tool and get result
-            if function_name == "get_current_time":
-                function_response = get_current_time()
-                yield f"\n"
-            elif function_name == "create_mermaid_diagram":
-                description = function_args.get("description", "")
-                diagram_code = generate_mermaid_diagram_sync(description)
-                function_response = diagram_code
-                stmd.st_mermaid(function_response, height=800)
-            elif function_name == "search_web":
-                query = function_args.get("query", "")
-                search_results = search_web(query)
-                function_response = json.dumps(search_results, indent=2)
-                # Create an expander for search results
-                with st.expander("🔍 View Search Results"):
-                    st.code(function_response, language="json")
-                yield "\nWeb search completed. Results available in dropdown above.\n\n"
-            else:
-                yield f"\nTool result: {function_response}\n\n"
-                
-            # Add tool result to messages
-            messages.append({
-                "role": "function",
-                "name": function_name,
-                "content": function_response
-            })
-            
-            # Get final response with tool result
-            final_response = client.chat.completions.create(
-                model="gpt-4o",
-                messages=messages,
-                stream=True
-            )
-            
-            for chunk in final_response:
-                if chunk.choices[0].delta.content:
-                    yield chunk.choices[0].delta.content
-        else:
-            # Regular streaming response
-            stream = client.chat.completions.create(
-                model="gpt-4o",
-                messages=messages,
-                stream=True
-            )
-            
-            for chunk in stream:
-                if chunk.choices[0].delta.content:
-                    yield chunk.choices[0].delta.content
+        response = client.chat.completions.create(
+            model=model_name,
+            messages=user_messages,
+            stream=True
+        )
+        
+        for chunk in response:
+            if chunk.choices[0].delta.content:
+                yield chunk.choices[0].delta.content
 
 
 #tools:

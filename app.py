@@ -52,6 +52,9 @@ import traceback
 from contextlib import redirect_stdout, redirect_stderr
 import matplotlib.pyplot as plt
 import numpy as np
+import seaborn as sns
+import scipy
+import pandas as pd
 
 
 # Initialize clients
@@ -1316,9 +1319,37 @@ def basic_chat():
 \n• Search the web for real-time information about any topic. 
 \n• Create visual diagrams and flowcharts. 
 \n• Generate images.
-
+\n• Analyze uploaded files (CSV, Excel, Word)
 """
         }]
+    
+    # Add file upload section
+    uploaded_file = st.file_uploader("Upload a file to chat about (CSV, Excel, or Word)", type=['csv', 'xlsx', 'docx'])
+    
+    if uploaded_file:
+        try:
+            # Process file based on type
+            file_content = ""
+            if uploaded_file.type == 'text/csv':
+                df = pd.read_csv(uploaded_file)
+                file_content = f"CSV Data Preview:\n{df.head().to_string()}\n\nShape: {df.shape}"
+            elif uploaded_file.type == 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':
+                df = pd.read_excel(uploaded_file)
+                file_content = f"Excel Data Preview:\n{df.head().to_string()}\n\nShape: {df.shape}"
+            elif uploaded_file.type == 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+                doc = DocxDocument(uploaded_file)
+                file_content = "\n".join([paragraph.text for paragraph in doc.paragraphs])
+            
+            # Add file content to conversation history
+            if file_content and not any(msg.get("file_content") == file_content for msg in st.session_state.messages):
+                st.session_state.messages.append({
+                    "role": "user",
+                    "content": f"The user has uploaded a file. Here's the content:\n\n{file_content}",
+                    "file_content": file_content  # Add this to prevent duplicate uploads
+                })
+                st.success(f"Successfully loaded {uploaded_file.name}")
+        except Exception as e:
+            st.error(f"Error processing file: {str(e)}")
     
     # Model and persona selection
     col1, col2, col3 = st.columns([2, 2, 1])
@@ -1344,6 +1375,9 @@ def basic_chat():
     
     # Display chat history
     for message in st.session_state.messages:
+        # Skip displaying file content messages directly
+        if message.get("file_content"):
+            continue
         with st.chat_message(message["role"]):
             st.markdown(message["content"])
     
@@ -1357,7 +1391,10 @@ def basic_chat():
         # Get system prompt based on persona
         system_prompt = personas[selected_persona]
         
-     
+        # Add file handling capabilities to system prompt if file was uploaded
+        if any(msg.get("file_content") for msg in st.session_state.messages):
+            system_prompt += "\nYou have access to the uploaded file content. You can analyze and answer questions about it."
+        
         messages = [{"role": "user", "content": system_prompt}] + st.session_state.messages
         
         # Display assistant response
@@ -1762,6 +1799,10 @@ def execute_code_safely(code: str) -> dict:
             st.pyplot(plt.gcf())
             plt.close()  # Clean up
             
+            # Set success message for plotting
+            result['output'] = "Plot generated successfully!"
+            result['result'] = "Visualization completed successfully"
+            
         # Capture output
         result['output'] = stdout_capture.getvalue()
         result['error'] = stderr_capture.getvalue()
@@ -1801,20 +1842,21 @@ def handle_code_execution(code: str) -> str:
     response_parts = []
     
     if result['success']:
-        response_parts.append("Code executed successfully!")
-        
-        if result['output']:
+        if result['has_plot']:
+            response_parts.append("✅ Visualization generated successfully!")
+            response_parts.append("\nThe plot is displayed above.")
+        else:
+            response_parts.append("✅ Code executed successfully!")
+            
+        if result['output'] and not result['has_plot']:
             response_parts.append("\nOutput:")
             response_parts.append(result['output'].rstrip())
             
-        if result['result'] is not None:
+        if result['result'] is not None and not result['has_plot']:
             response_parts.append("\nReturn value:")
             response_parts.append(str(result['result']))
-            
-        if result['has_plot']:
-            response_parts.append("\nPlot generated and displayed above.")
     else:
-        response_parts.append("Code execution failed!")
+        response_parts.append("❌ Code execution failed!")
         response_parts.append("\nError:")
         response_parts.append(result['error'])
     
@@ -1939,25 +1981,25 @@ async def streamlit_main():
         feedback = st.text_area("Provide feedback to improve the job description:", 
                             placeholder="example: Follow exactly the PWS languages, tailor for CBM+ projects, 7 years of experience instead of 5, etc...")
         
-    if st.button("Improve Job Description"):
-        if feedback and st.session_state.job_description:
-            with st.spinner("Improving job description..."):
-                improved_jd_placeholder = st.empty()
-                improved_content = ""
-                for content in improve_job_description(
-                    st.session_state.job_description,
-                    feedback,
-                    st.session_state.job_title,
-                    st.session_state.additional_requirements
-                ):
-                    improved_content += content
-                    improved_jd_placeholder.markdown(improved_content + "▌")
-                improved_jd_placeholder.markdown(improved_content)
-                st.session_state.job_description = improved_content
-        elif not st.session_state.job_description:
-            st.warning("Please generate a job description first.")
-        else:
-            st.warning("Please provide feedback to improve the job description.")
+        if st.button("Improve Job Description"):
+            if feedback and st.session_state.job_description:
+                with st.spinner("Improving job description..."):
+                    improved_jd_placeholder = st.empty()
+                    improved_content = ""
+                    for content in improve_job_description(
+                        st.session_state.job_description,
+                        feedback,
+                        st.session_state.job_title,
+                        st.session_state.additional_requirements
+                    ):
+                        improved_content += content
+                        improved_jd_placeholder.markdown(improved_content + "▌")
+                    improved_jd_placeholder.markdown(improved_content)
+                    st.session_state.job_description = improved_content
+            elif not st.session_state.job_description:
+                st.warning("Please generate a job description first.")
+            else:
+                st.warning("Please provide feedback to improve the job description.")
             
     elif tool_choice == "BD Response Assistant":
         st.header("BD Response Assistant 📄")

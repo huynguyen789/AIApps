@@ -349,20 +349,28 @@ async def generate_job_description(job_title, additional_requirements, is_pws):
         formatted_text = content.replace('\n', '  \n')
         yield formatted_text
 
-async def improve_job_description(original_jd, feedback, job_title, additional_requirements):
+def improve_job_description(original_jd, feedback, job_title, additional_requirements):
     improve_prompt = load_prompt('improve_job_description.txt')
     improve_input = f"""
-        Original Job Title: {job_title}
-        Additional Requirements: {additional_requirements}
+Original Job Title: {job_title}
+Additional Requirements: {additional_requirements}
 
-        Original Job Description:
-        {original_jd}
+Original Job Description:
+{original_jd}
 
-        User Feedback:
-        {feedback}
+User Feedback:
+{feedback}
 """
-    async for content in generate_response("gpt4", improve_input, system_prompt=improve_prompt):
-        yield content
+    client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+    response = client.chat.completions.create(
+        model="gpt-4o",
+        messages=[
+            {"role": "system", "content": improve_prompt},
+            {"role": "user", "content": improve_input}
+        ],
+        temperature=0
+    )
+    return response.choices[0].message.content
 #########################################################
 
 
@@ -1722,6 +1730,7 @@ async def streamlit_main():
         if user_request:
             await prompt_generator(user_request)
             
+    # Add this to the Job Description Assistant section
     elif tool_choice == "Job Description Assistant":
         st.header("Job Description Assistant 📝")
         st.write("Enter the job title and any additional requirements to generate a high-quality job description.")
@@ -1736,9 +1745,9 @@ async def streamlit_main():
             st.session_state.is_pws = False
 
         job_title = st.text_input("Enter the job title:", 
-                                  value=st.session_state.job_title, 
-                                  placeholder="e.g., Senior Software Engineer",
-                                  key="job_title_input")
+                                value=st.session_state.job_title, 
+                                placeholder="e.g., Senior Software Engineer",
+                                key="job_title_input")
 
         # File upload option for additional requirements
         req_file = st.file_uploader("Upload additional requirements (Word or Text file) - Optional", type=['docx', 'txt'])
@@ -1746,9 +1755,9 @@ async def streamlit_main():
             st.session_state.additional_requirements = read_file(req_file)
         
         additional_requirements = st.text_area("Enter any additional requirements (optional):", 
-                                               value=st.session_state.additional_requirements,
-                                               placeholder="TS clearance, 5+ years of experience in Python, knowledge of machine learning, etc.",
-                                               key="job_description_requirements")
+                                            value=st.session_state.additional_requirements,
+                                            placeholder="TS clearance, 5+ years of experience in Python, knowledge of machine learning, etc.",
+                                            key="job_description_requirements")
 
         # Add PWS checkbox
         is_pws = st.checkbox("This is a PWS (model will follow PWS language strictly)", value=st.session_state.is_pws, key="is_pws_checkbox")
@@ -1768,27 +1777,26 @@ async def streamlit_main():
             else:
                 st.warning("Please enter a job title.")
         
-        # Display the current job description
-        # if st.session_state.job_description:
-        #     st.markdown("### Current Job Description")
-        #     st.markdown(st.session_state.job_description)
                 
-        feedback = st.text_area("Provide feedback to improve the job description:", placeholder="example: Follow exactly the PWS languages, tailor for CBM+ projects, 7 years of experience instead of 5, etc...")
+        feedback = st.text_area("Provide feedback to improve the job description:", 
+                            placeholder="example: Follow exactly the PWS languages, tailor for CBM+ projects, 7 years of experience instead of 5, etc...")
         
-        if st.button("Improve Job Description"):
+    if st.button("Improve Job Description"):
             if feedback and st.session_state.job_description:
                 with st.spinner("Improving job description..."):
-                    improved_jd_placeholder = st.empty()
-                    improved_content = ""
-                    async for content in improve_job_description(st.session_state.job_description, feedback, st.session_state.job_title, st.session_state.additional_requirements):
-                        improved_content += content
-                        improved_jd_placeholder.markdown(improved_content)
+                    improved_content = improve_job_description(
+                        st.session_state.job_description,
+                        feedback,
+                        st.session_state.job_title,
+                        st.session_state.additional_requirements
+                    )
                     st.session_state.job_description = improved_content
+                    st.markdown("### Improved Job Description")
+                    st.markdown(improved_content)
             elif not st.session_state.job_description:
                 st.warning("Please generate a job description first.")
             else:
                 st.warning("Please provide feedback to improve the job description.")
-
     elif tool_choice == "BD Response Assistant":
         st.header("BD Response Assistant 📄")
         

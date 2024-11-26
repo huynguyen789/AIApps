@@ -133,3 +133,8 @@ webencodings==0.5.1
 wrapt==1.16.0
 yarl==1.17.1
 youtube-transcript-api==0.6.2
+matplotlib==3.9.2
+numpy==1.26.4
+seaborn==0.13.2
+scipy==1.14.1
+pandas==2.2.3

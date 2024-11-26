@@ -1868,6 +1868,8 @@ def handle_code_execution(code: str) -> str:
 
 #MAIN APP
 async def streamlit_main():
+
+
     # Disable OpenAI request logging
     logging.getLogger("openai").setLevel(logging.INFO)
 

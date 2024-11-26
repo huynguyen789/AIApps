@@ -1344,7 +1344,6 @@ def basic_chat():
                 """
                 # Store df in session state for later use
                 st.session_state['current_df'] = df
-                
             elif uploaded_file.type == 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
                 doc = DocxDocument(uploaded_file)
                 file_content = "\n".join([paragraph.text for paragraph in doc.paragraphs])
@@ -1754,8 +1753,13 @@ def generate_image(prompt: str, size: str = "1024x1024", quality: str = "standar
 def execute_code_safely(code: str) -> dict:
     """
     Input: Python code string
-    Process: Executes code and captures output/errors/plots
-    Output: Dict with execution results
+    Process: Executes code and captures output/errors/plots. Automatically detects plotting code.
+    Output: Dict with execution results including output, errors, plots and return value
+    
+    Insights:
+    - Detects plotting by checking for common plotting library imports and functions
+    - Sets up dark theme for plots automatically when needed
+    - Handles both regular code execution and plotting scenarios
     """
     result = {
         'success': False,
@@ -1765,27 +1769,7 @@ def execute_code_safely(code: str) -> dict:
         'has_plot': False
     }
     
-    # Create execution context with necessary globals
-    exec_globals = {
-        'plt': plt,
-        'pd': pd,
-        'sns': sns,
-        'np': np,
-    }
-    
-    # Add df from session state if available
-    if 'current_df' in st.session_state:
-        exec_globals['df'] = st.session_state['current_df']
-    else:
-        return {
-            'success': False,
-            'error': 'No data loaded. Please upload a CSV or Excel file first.',
-            'output': '',
-            'result': None,
-            'has_plot': False
-        }
-    
-    # Check if code contains plotting commands
+    # Detect if code contains plotting-related commands
     plotting_keywords = [
         'plt.', 'matplotlib', 'seaborn', 'sns.', 
         '.plot(', '.scatter(', '.hist(', '.bar(',
@@ -1805,11 +1789,11 @@ def execute_code_safely(code: str) -> dict:
     stderr_capture = io.StringIO()
     
     try:
-        # Execute code with the prepared globals
+        # Execute code
         with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
-            exec(code, exec_globals)
+            exec(code, globals())
             
-        # Handle plotting output
+        # Handle plotting if detected
         if is_plotting and plt.get_fignums():
             result['has_plot'] = True
             # Style the plot for dark theme
@@ -1823,8 +1807,9 @@ def execute_code_safely(code: str) -> dict:
                 
             # Display plot
             st.pyplot(plt.gcf())
-            plt.close()
+            plt.close()  # Clean up
             
+            # Set success message for plotting
             result['output'] = "Plot generated successfully!"
             result['result'] = "Visualization completed successfully"
             
@@ -1833,11 +1818,20 @@ def execute_code_safely(code: str) -> dict:
         result['error'] = stderr_capture.getvalue()
         result['success'] = True
         
+        # Try to get last expression value for non-plotting code
+        if not is_plotting:
+            try:
+                last_line = code.strip().split('\n')[-1]
+                if not last_line.startswith(('import', 'from', 'def', 'class', 'print')):
+                    result['result'] = eval(last_line, globals())
+            except:
+                pass
+            
     except Exception as e:
         result['success'] = False
         result['error'] = f"{type(e).__name__}: {str(e)}\n{traceback.format_exc()}"
         if is_plotting:
-            plt.close()
+            plt.close()  # Clean up on error
     
     return result
 

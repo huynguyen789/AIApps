@@ -362,15 +362,20 @@ User Feedback:
 {feedback}
 """
     client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
-    response = client.chat.completions.create(
+    stream = client.chat.completions.create(
         model="gpt-4o",
         messages=[
             {"role": "system", "content": improve_prompt},
             {"role": "user", "content": improve_input}
         ],
-        temperature=0
+        temperature=0,
+        stream=True
     )
-    return response.choices[0].message.content
+    
+    for chunk in stream:
+        if chunk.choices[0].delta.content is not None:
+            yield chunk.choices[0].delta.content
+
 #########################################################
 
 
@@ -1782,21 +1787,25 @@ async def streamlit_main():
                             placeholder="example: Follow exactly the PWS languages, tailor for CBM+ projects, 7 years of experience instead of 5, etc...")
         
     if st.button("Improve Job Description"):
-            if feedback and st.session_state.job_description:
-                with st.spinner("Improving job description..."):
-                    improved_content = improve_job_description(
-                        st.session_state.job_description,
-                        feedback,
-                        st.session_state.job_title,
-                        st.session_state.additional_requirements
-                    )
-                    st.session_state.job_description = improved_content
-                    st.markdown("### Improved Job Description")
-                    st.markdown(improved_content)
-            elif not st.session_state.job_description:
-                st.warning("Please generate a job description first.")
-            else:
-                st.warning("Please provide feedback to improve the job description.")
+        if feedback and st.session_state.job_description:
+            with st.spinner("Improving job description..."):
+                improved_jd_placeholder = st.empty()
+                improved_content = ""
+                for content in improve_job_description(
+                    st.session_state.job_description,
+                    feedback,
+                    st.session_state.job_title,
+                    st.session_state.additional_requirements
+                ):
+                    improved_content += content
+                    improved_jd_placeholder.markdown(improved_content + "▌")
+                improved_jd_placeholder.markdown(improved_content)
+                st.session_state.job_description = improved_content
+        elif not st.session_state.job_description:
+            st.warning("Please generate a job description first.")
+        else:
+            st.warning("Please provide feedback to improve the job description.")
+            
     elif tool_choice == "BD Response Assistant":
         st.header("BD Response Assistant 📄")
         

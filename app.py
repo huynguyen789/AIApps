@@ -142,7 +142,7 @@ def render_model_selector(default_model="gemini-flash"):
     Output: Selected model name
     Logic: Uses index of default model in available models list
     """
-    available_models = ["gemini-flash", "gemini-pro", "claude", "gpt4o", "o1-preview", "o1-mini"]
+    available_models = ["gemini-flash", "gemini-pro", "claude", "gpt4o", "o1-preview(advanced reasoning)", "o1-mini(advanced reasoning)"]
     try:
         default_index = available_models.index(default_model)
     except ValueError:
@@ -1292,8 +1292,10 @@ def basic_chat():
             "role": "assistant",
             "content": f"""👋 Hi! I'm your AI assistant. Here's what I can help you with:
 \n• Answer questions, brainstorms, summarize, explain, etc.
-\n• Search the web for real-time information about any topic. (Only gpt4o)
-\n• Create visual diagrams and flowcharts. (Only gpt4o)
+\nOnly gpt4o capabilities:
+\n• Search the web for real-time information about any topic. 
+\n• Create visual diagrams and flowcharts. 
+\n• Generate images.
 
 Just ask me anything! I'll use the best tools available to help you."""
         }]

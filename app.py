@@ -1330,12 +1330,21 @@ def basic_chat():
         try:
             # Process file based on type
             file_content = ""
-            if uploaded_file.type == 'text/csv':
-                df = pd.read_csv(uploaded_file)
-                file_content = f"CSV Data Preview:\n{df.head().to_string()}\n\nShape: {df.shape}"
-            elif uploaded_file.type == 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':
-                df = pd.read_excel(uploaded_file)
-                file_content = f"Excel Data Preview:\n{df.head().to_string()}\n\nShape: {df.shape}"
+            if uploaded_file.type in ['text/csv', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']:
+                df = pd.read_csv(uploaded_file) if uploaded_file.type == 'text/csv' else pd.read_excel(uploaded_file)
+                file_content = f"""CSV/Excel Data Preview:\n{df.head().to_string()}\n\nShape: {df.shape}
+                
+                Note: The data is loaded in a 'df' variable. You can use it for plotting like:
+                - Basic plot: `plt.plot(df['column_name'])`
+                - Scatter plot: `plt.scatter(df['x_column'], df['y_column'])`
+                - Histogram: `plt.hist(df['column_name'])`
+                - Seaborn plots: `sns.heatmap(df.corr())`
+                
+                Available columns: {', '.join(df.columns.tolist())}
+                """
+                # Store df in session state for later use
+                st.session_state['current_df'] = df
+                
             elif uploaded_file.type == 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
                 doc = DocxDocument(uploaded_file)
                 file_content = "\n".join([paragraph.text for paragraph in doc.paragraphs])
@@ -1653,6 +1662,8 @@ def generate_response_sync(model_name: str, messages: list):
             if chunk.choices[0].delta.content:
                 yield chunk.choices[0].delta.content
 
+
+
 #tools:
 def get_current_time():
     """Get current time in readable format"""
@@ -1743,13 +1754,8 @@ def generate_image(prompt: str, size: str = "1024x1024", quality: str = "standar
 def execute_code_safely(code: str) -> dict:
     """
     Input: Python code string
-    Process: Executes code and captures output/errors/plots. Automatically detects plotting code.
-    Output: Dict with execution results including output, errors, plots and return value
-    
-    Insights:
-    - Detects plotting by checking for common plotting library imports and functions
-    - Sets up dark theme for plots automatically when needed
-    - Handles both regular code execution and plotting scenarios
+    Process: Executes code and captures output/errors/plots
+    Output: Dict with execution results
     """
     result = {
         'success': False,
@@ -1759,7 +1765,27 @@ def execute_code_safely(code: str) -> dict:
         'has_plot': False
     }
     
-    # Detect if code contains plotting-related commands
+    # Create execution context with necessary globals
+    exec_globals = {
+        'plt': plt,
+        'pd': pd,
+        'sns': sns,
+        'np': np,
+    }
+    
+    # Add df from session state if available
+    if 'current_df' in st.session_state:
+        exec_globals['df'] = st.session_state['current_df']
+    else:
+        return {
+            'success': False,
+            'error': 'No data loaded. Please upload a CSV or Excel file first.',
+            'output': '',
+            'result': None,
+            'has_plot': False
+        }
+    
+    # Check if code contains plotting commands
     plotting_keywords = [
         'plt.', 'matplotlib', 'seaborn', 'sns.', 
         '.plot(', '.scatter(', '.hist(', '.bar(',
@@ -1779,11 +1805,11 @@ def execute_code_safely(code: str) -> dict:
     stderr_capture = io.StringIO()
     
     try:
-        # Execute code
+        # Execute code with the prepared globals
         with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
-            exec(code, globals())
+            exec(code, exec_globals)
             
-        # Handle plotting if detected
+        # Handle plotting output
         if is_plotting and plt.get_fignums():
             result['has_plot'] = True
             # Style the plot for dark theme
@@ -1797,9 +1823,8 @@ def execute_code_safely(code: str) -> dict:
                 
             # Display plot
             st.pyplot(plt.gcf())
-            plt.close()  # Clean up
+            plt.close()
             
-            # Set success message for plotting
             result['output'] = "Plot generated successfully!"
             result['result'] = "Visualization completed successfully"
             
@@ -1808,20 +1833,11 @@ def execute_code_safely(code: str) -> dict:
         result['error'] = stderr_capture.getvalue()
         result['success'] = True
         
-        # Try to get last expression value for non-plotting code
-        if not is_plotting:
-            try:
-                last_line = code.strip().split('\n')[-1]
-                if not last_line.startswith(('import', 'from', 'def', 'class', 'print')):
-                    result['result'] = eval(last_line, globals())
-            except:
-                pass
-            
     except Exception as e:
         result['success'] = False
         result['error'] = f"{type(e).__name__}: {str(e)}\n{traceback.format_exc()}"
         if is_plotting:
-            plt.close()  # Clean up on error
+            plt.close()
     
     return result
 

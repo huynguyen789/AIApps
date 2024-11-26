@@ -50,8 +50,9 @@ import sys
 import io
 import traceback
 from contextlib import redirect_stdout, redirect_stderr
-import math
-import random
+import matplotlib.pyplot as plt
+import numpy as np
+
 
 # Initialize clients
 openai_client = AsyncOpenAI(api_key=st.secrets["OPENAI_API_KEY"])
@@ -1316,7 +1317,7 @@ def basic_chat():
 \n• Create visual diagrams and flowcharts. 
 \n• Generate images.
 
-Just ask me anything! I'll use the best tools available to help you."""
+"""
         }]
     
     # Model and persona selection
@@ -1705,43 +1706,84 @@ def generate_image(prompt: str, size: str = "1024x1024", quality: str = "standar
 def execute_code_safely(code: str) -> dict:
     """
     Input: Python code string
-    Process: Executes code and captures output/errors
-    Output: Dict with execution results including output, errors, and return value
+    Process: Executes code and captures output/errors/plots. Automatically detects plotting code.
+    Output: Dict with execution results including output, errors, plots and return value
+    
+    Insights:
+    - Detects plotting by checking for common plotting library imports and functions
+    - Sets up dark theme for plots automatically when needed
+    - Handles both regular code execution and plotting scenarios
     """
     result = {
         'success': False,
         'output': '',
         'error': '',
-        'result': None
+        'result': None,
+        'has_plot': False
     }
+    
+    # Detect if code contains plotting-related commands
+    plotting_keywords = [
+        'plt.', 'matplotlib', 'seaborn', 'sns.', 
+        '.plot(', '.scatter(', '.hist(', '.bar(',
+        '.figure(', '.subplot(', '.imshow('
+    ]
+    is_plotting = any(keyword in code for keyword in plotting_keywords)
+    
+    # Set up plotting environment if needed
+    if is_plotting:
+        plt.style.use('dark_background')
+        plt_fig = plt.figure(facecolor='#0E1117')
+        ax = plt_fig.add_subplot(111)
+        ax.set_facecolor('#0E1117')
     
     # Capture stdout and stderr
     stdout_capture = io.StringIO()
     stderr_capture = io.StringIO()
     
     try:
-        # Execute code with full access to Python environment
+        # Execute code
         with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
             exec(code, globals())
+            
+        # Handle plotting if detected
+        if is_plotting and plt.get_fignums():
+            result['has_plot'] = True
+            # Style the plot for dark theme
+            plt.gcf().patch.set_facecolor('#0E1117')
+            for ax in plt.gcf().get_axes():
+                ax.set_facecolor('#0E1117')
+                ax.tick_params(colors='white')
+                ax.xaxis.label.set_color('white')
+                ax.yaxis.label.set_color('white')
+                ax.title.set_color('white')
+                
+            # Display plot
+            st.pyplot(plt.gcf())
+            plt.close()  # Clean up
             
         # Capture output
         result['output'] = stdout_capture.getvalue()
         result['error'] = stderr_capture.getvalue()
         result['success'] = True
         
-        # Try to get last expression value
-        try:
-            last_line = code.strip().split('\n')[-1]
-            if not last_line.startswith(('import', 'from', 'def', 'class', 'print')):
-                result['result'] = eval(last_line, globals())
-        except:
-            pass
+        # Try to get last expression value for non-plotting code
+        if not is_plotting:
+            try:
+                last_line = code.strip().split('\n')[-1]
+                if not last_line.startswith(('import', 'from', 'def', 'class', 'print')):
+                    result['result'] = eval(last_line, globals())
+            except:
+                pass
             
     except Exception as e:
         result['success'] = False
         result['error'] = f"{type(e).__name__}: {str(e)}\n{traceback.format_exc()}"
+        if is_plotting:
+            plt.close()  # Clean up on error
     
     return result
+
 def handle_code_execution(code: str) -> str:
     """
     Handles code execution and formats the response.
@@ -1768,13 +1810,15 @@ def handle_code_execution(code: str) -> str:
         if result['result'] is not None:
             response_parts.append("\nReturn value:")
             response_parts.append(str(result['result']))
+            
+        if result['has_plot']:
+            response_parts.append("\nPlot generated and displayed above.")
     else:
         response_parts.append("Code execution failed!")
         response_parts.append("\nError:")
         response_parts.append(result['error'])
     
     return "\n".join(response_parts)
-
 #########################################################
 
 

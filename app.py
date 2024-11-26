@@ -1549,96 +1549,96 @@ def generate_response_sync(model_name: str, messages: list):
         }
         ]
         
-
-        response = client.chat.completions.create(
-            model="gpt-4o",
-            messages=messages,
-            tools=tools,
-            tool_choice="auto",
-            stream=False
-        )
+        with st.spinner('Getting answer...'):
+            response = client.chat.completions.create(
+                model="gpt-4o",
+                messages=messages,
+                tools=tools,
+                tool_choice="auto",
+                stream=False
+            )
         
-     
-        # Handle tool calls
-        if response.choices[0].message.tool_calls:
-            tool_call = response.choices[0].message.tool_calls[0]
-            function_name = tool_call.function.name
-            function_args = json.loads(tool_call.function.arguments)
-            
-            yield f"\nUsing tool: {function_name}\n"
-            
-            # Execute tool and get result
-            if function_name == "generate_image":
-                yield f"\nNote:\n The image will be deleted in the next message. Please save it before."
         
-                with st.spinner('Generating image, please wait...'):
-                    function_response = generate_image(
-                        prompt=function_args.get("prompt"),
-                        size=function_args.get("size", "1024x1024"),
-                        quality=function_args.get("quality", "standard")
-                    )
+            # Handle tool calls
+            if response.choices[0].message.tool_calls:
+                tool_call = response.choices[0].message.tool_calls[0]
+                function_name = tool_call.function.name
+                function_args = json.loads(tool_call.function.arguments)
                 
+                yield f"\nUsing tool: {function_name}\n"
                 
-            elif function_name == "get_current_time":
-                function_response = get_current_time()
-                yield f"\n"
-            elif function_name == "create_mermaid_diagram":
-                description = function_args.get("description", "")
-                diagram_code = generate_mermaid_diagram_sync(description)
-                function_response = diagram_code
-                stmd.st_mermaid(function_response, height=800)
-            elif function_name == "search_web":
-                query = function_args.get("query", "")
-                search_results = search_web(query)
-                function_response = json.dumps(search_results, indent=2)
-                # Create an expander for search results
-                with st.expander("🔍 View Search Results"):
-                    st.code(function_response, language="json")
-                yield "\nWeb search completed. Results available in dropdown above.\n\n"
-                
-            elif function_name == "execute_python_code":
-                code = function_args.get("code", "")
-                result = execute_code_safely(code)
-                if result['success']:
-                    function_response = f"Output:\n{result['output']}\n"
-                    if 'result' in result:
-                        function_response += f"Result: {result['result']}"
+                # Execute tool and get result
+                if function_name == "generate_image":
+                    yield f"\nNote:\n The image will be deleted in the next message. Please save it before."
+            
+                    with st.spinner('Generating image, please wait...'):
+                        function_response = generate_image(
+                            prompt=function_args.get("prompt"),
+                            size=function_args.get("size", "1024x1024"),
+                            quality=function_args.get("quality", "standard")
+                        )
+                    
+                    
+                elif function_name == "get_current_time":
+                    function_response = get_current_time()
+                    yield f"\n"
+                elif function_name == "create_mermaid_diagram":
+                    description = function_args.get("description", "")
+                    diagram_code = generate_mermaid_diagram_sync(description)
+                    function_response = diagram_code
+                    stmd.st_mermaid(function_response, height=800)
+                elif function_name == "search_web":
+                    query = function_args.get("query", "")
+                    search_results = search_web(query)
+                    function_response = json.dumps(search_results, indent=2)
+                    # Create an expander for search results
+                    with st.expander("🔍 View Search Results"):
+                        st.code(function_response, language="json")
+                    yield "\nWeb search completed. Results available in dropdown above.\n\n"
+                    
+                elif function_name == "execute_python_code":
+                    code = function_args.get("code", "")
+                    result = execute_code_safely(code)
+                    if result['success']:
+                        function_response = f"Output:\n{result['output']}\n"
+                        if 'result' in result:
+                            function_response += f"Result: {result['result']}"
+                    else:
+                        function_response = f"Error:\n{result['error']}"
+                    yield f"\n```python\n{code}\n```\n{function_response}\n"
+        
                 else:
-                    function_response = f"Error:\n{result['error']}"
-                yield f"\n```python\n{code}\n```\n{function_response}\n"
-    
-            else:
-                yield f"\nTool result: {function_response}\n\n"
+                    yield f"\nTool result: {function_response}\n\n"
+                    
+                # Add tool result to messages
+                messages.append({
+                    "role": "function",
+                    "name": function_name,
+                    "content": function_response
+                })
                 
-            # Add tool result to messages
-            messages.append({
-                "role": "function",
-                "name": function_name,
-                "content": function_response
-            })
-            
-            # Get final response with tool result
-            final_response = client.chat.completions.create(
-                model="gpt-4o",
-                messages=messages,
-                stream=True
-            )
-            
-            yield f"\n"
-            for chunk in final_response:
-                if chunk.choices[0].delta.content:
-                    yield chunk.choices[0].delta.content
-        else:
-            # Regular streaming response
-            stream = client.chat.completions.create(
-                model="gpt-4o",
-                messages=messages,
-                stream=True
-            )
-            
-            for chunk in stream:
-                if chunk.choices[0].delta.content:
-                    yield chunk.choices[0].delta.content
+                # Get final response with tool result
+                final_response = client.chat.completions.create(
+                    model="gpt-4o",
+                    messages=messages,
+                    stream=True
+                )
+                
+                yield f"\n"
+                for chunk in final_response:
+                    if chunk.choices[0].delta.content:
+                        yield chunk.choices[0].delta.content
+            else:
+                # Regular streaming response
+                stream = client.chat.completions.create(
+                    model="gpt-4o",
+                    messages=messages,
+                    stream=True
+                )
+                
+                for chunk in stream:
+                    if chunk.choices[0].delta.content:
+                        yield chunk.choices[0].delta.content
 
     elif model_name in ['o1-preview', 'o1-mini']:
         # Special handling for o1 models - strip system messages and tools

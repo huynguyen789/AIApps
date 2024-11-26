@@ -1341,6 +1341,9 @@ def basic_chat():
                 - Seaborn plots: `sns.heatmap(df.corr())`
                 
                 Available columns: {', '.join(df.columns.tolist())}
+                
+                ***IMPORTANT***:
+                - IF THE DATA IS LOADED IN THE DF ALREADY, RUN CODE ON IT, DONT GENERATE FAKE DATA. 
                 """
                 # Store df in session state for later use
                 st.session_state['current_df'] = df
@@ -1598,6 +1601,13 @@ def generate_response_sync(model_name: str, messages: list):
                     
                 elif function_name == "execute_python_code":
                     code = function_args.get("code", "")
+                    # Add check for df in session state
+                    if 'current_df' not in st.session_state:
+                        return "Error: No DataFrame loaded. Please upload a CSV/Excel file first."
+                        
+                    # Add df to globals so the executed code can access it
+                    globals()['df'] = st.session_state.current_df
+                    
                     result = execute_code_safely(code)
                     if result['success']:
                         function_response = f"Output:\n{result['output']}\n"

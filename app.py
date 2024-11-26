@@ -40,12 +40,18 @@ import re
 from rank_bm25 import BM25Okapi
 import tempfile
 from openai import OpenAI
-# At the top of your file after imports
+
 import logging
 logging.getLogger("openai").setLevel(logging.INFO)  # Change from ERROR to INFO to see the logs
 
 from docx import Document as DocxDocument  # For Word document handling
 
+import sys
+import io
+import traceback
+from contextlib import redirect_stdout, redirect_stderr
+import math
+import random
 
 # Initialize clients
 openai_client = AsyncOpenAI(api_key=st.secrets["OPENAI_API_KEY"])
@@ -1477,6 +1483,23 @@ def generate_response_sync(model_name: str, messages: list):
                     "required": ["prompt"]
                 }
             }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "execute_python_code",
+                "description": "Execute Python code and return the results. Use this when the user wants to run code or when you need to compute something.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "code": {
+                            "type": "string",
+                            "description": "The Python code to execute"
+                        }
+                    },
+                    "required": ["code"]
+                }
+            }
         }
         ]
         
@@ -1526,6 +1549,18 @@ def generate_response_sync(model_name: str, messages: list):
                 with st.expander("🔍 View Search Results"):
                     st.code(function_response, language="json")
                 yield "\nWeb search completed. Results available in dropdown above.\n\n"
+                
+            elif function_name == "execute_python_code":
+                code = function_args.get("code", "")
+                result = execute_code_safely(code)
+                if result['success']:
+                    function_response = f"Output:\n{result['output']}\n"
+                    if 'result' in result:
+                        function_response += f"Result: {result['result']}"
+                else:
+                    function_response = f"Error:\n{result['error']}"
+                yield f"\n```python\n{code}\n```\n{function_response}\n"
+    
             else:
                 yield f"\nTool result: {function_response}\n\n"
                 
@@ -1579,7 +1614,6 @@ def generate_response_sync(model_name: str, messages: list):
         for chunk in response:
             if chunk.choices[0].delta.content:
                 yield chunk.choices[0].delta.content
-
 
 #tools:
 def get_current_time():
@@ -1666,6 +1700,81 @@ def generate_image(prompt: str, size: str = "1024x1024", quality: str = "standar
             return f"I've generated an image based on your prompt. You can see it above.\nRevised prompt: {response.data[0].revised_prompt}"
         except Exception as e:
             return f"Error generating image: {str(e)}"
+
+
+def execute_code_safely(code: str) -> dict:
+    """
+    Input: Python code string
+    Process: Executes code and captures output/errors
+    Output: Dict with execution results including output, errors, and return value
+    """
+    result = {
+        'success': False,
+        'output': '',
+        'error': '',
+        'result': None
+    }
+    
+    # Capture stdout and stderr
+    stdout_capture = io.StringIO()
+    stderr_capture = io.StringIO()
+    
+    try:
+        # Execute code with full access to Python environment
+        with redirect_stdout(stdout_capture), redirect_stderr(stderr_capture):
+            exec(code, globals())
+            
+        # Capture output
+        result['output'] = stdout_capture.getvalue()
+        result['error'] = stderr_capture.getvalue()
+        result['success'] = True
+        
+        # Try to get last expression value
+        try:
+            last_line = code.strip().split('\n')[-1]
+            if not last_line.startswith(('import', 'from', 'def', 'class', 'print')):
+                result['result'] = eval(last_line, globals())
+        except:
+            pass
+            
+    except Exception as e:
+        result['success'] = False
+        result['error'] = f"{type(e).__name__}: {str(e)}\n{traceback.format_exc()}"
+    
+    return result
+def handle_code_execution(code: str) -> str:
+    """
+    Handles code execution and formats the response.
+    
+    Args:
+        code (str): Python code to execute
+    
+    Returns:
+        str: Formatted response containing execution results
+    """
+    # Execute the code
+    result = execute_code_safely(code)
+    
+    # Format the response
+    response_parts = []
+    
+    if result['success']:
+        response_parts.append("Code executed successfully!")
+        
+        if result['output']:
+            response_parts.append("\nOutput:")
+            response_parts.append(result['output'].rstrip())
+            
+        if result['result'] is not None:
+            response_parts.append("\nReturn value:")
+            response_parts.append(str(result['result']))
+    else:
+        response_parts.append("Code execution failed!")
+        response_parts.append("\nError:")
+        response_parts.append(result['error'])
+    
+    return "\n".join(response_parts)
+
 #########################################################
 
 
